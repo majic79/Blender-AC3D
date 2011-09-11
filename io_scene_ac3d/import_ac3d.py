@@ -613,6 +613,7 @@ class AC3DImport:
 		scene = self.scene
 
 		bl_images = {} # loaded texture images
+		bl_textures = {} # loaded textures
 		missing_textures = [] # textures we couldn't find
 
 		objlist = self.objlist[1:] # skip 'world'
@@ -636,9 +637,7 @@ class AC3DImport:
 				continue
 			elif obj.type == AC_LIGHT:
 				light = Lamp.New('Lamp')
-				object = scene.objects.new(light, obj.name)
-				#object.select(True)
-				obj.bl_obj = object
+				obj.bl_obj = scene.objects.new(light, obj.name)
 				if obj.data:
 					light.name = obj.data
 				continue
@@ -650,33 +649,30 @@ class AC3DImport:
 				obj.type = AC_GROUP
 				continue
 
-
+			# Create mesh
 			mesh = bpy.data.meshes.new(obj.name)
-			object = bpy.data.objects.new(obj.name,mesh)
-			obj.bl_obj = object
-			if obj.data: mesh.name = obj.data
-			# will auto clamp to [1, 80] (majic79: Will it? maybe it did in 2.4, no idea what it does in 2.5)
-			mesh.auto_smooth_angle = obj.crease
+			# Create object based on the mesh
+			obj.bl_obj = bpy.data.objects.new(obj.name,mesh)
+			if obj.data:
+				mesh.name = obj.data
 
 			if not obj.vlist: # no vertices? nothing more to do
 				continue
-
+			# Load vertices data into the object (don't bother with edge data)
 			mesh.from_pydata(obj.vlist, [], obj.flist_v)
+			# (re)calculate normals
+			mesh.calc_normals()
+			mesh.use_auto_smooth = self.use_auto_smooth
+			# will auto clamp to [1, 80]
+			mesh.auto_smooth_angle = radians(obj.crease)
+#			mesh.auto_smooth_angle = self.auto_smooth_angle
+			mesh.show_double_sided = self.show_double_sided
 
-			objmat_indices = []
-			for mat in bmat:
-				if bmat.index(mat) in obj.matlist:
-					objmat_indices.append(bmat.index(mat))
-					mesh.materials.append(mat)
+			# if we don't link the object to the scene, it's not displayed
+			scene.objects.link(obj.bl_obj)
 
-					if mat.alpha < 1.0:
-						mat.use_transparency=self.use_transparency
-						mat.transparency_method=self.transparency_method
-						object.show_transparent = self.display_transparency
-
-			scene.objects.link(object)
-			# shouldn't happen, of course
 			facesnum = len(mesh.faces)
+			# shouldn't happen, of course
 			if facesnum == 0: 
 				continue
 
@@ -697,9 +693,11 @@ class AC3DImport:
 						cfglist.pop(fi)
 
 			img = None
+			tex = None
 			if obj.tex != '':
 				if obj.tex in bl_images.keys():
 					img = bl_images[obj.tex]
+					tex = bl_textures[obj.tex]
 				elif obj.tex not in missing_textures:
 					texfname = None
 					objtex = obj.tex
@@ -730,13 +728,39 @@ class AC3DImport:
 						missing_textures.append(obj.tex)
 						inform("Couldn't find texture: %s" % baseimgname)
 
-			uv_faces = []
+			uv_tex = None
 			if img:
+				if not tex:
+					tex = bpy.data.textures.new(obj.tex, 'IMAGE')
+					tex.image = img
+					tex.use_preview_alpha = True
+					bl_textures[obj.tex]=tex
+
+				obj.tex_bl = tex
 				uv_tex = mesh.uv_textures.new(obj.tex)
 				uv_tex.active = True
-				uv_faces = uv_tex.data[:]
-				
+					
 #				uv_faces = mesh.uv_textures.active.data[:]
+
+
+			objmat_indices = []
+			for mat in bmat:
+				if bmat.index(mat) in obj.matlist:
+					objmat_indices.append(bmat.index(mat))
+					
+					if img and tex:
+						if not tex.name in mat.texture_slots:
+							tex_slot = mat.texture_slots.add()
+							tex_slot.texture = tex
+							tex_slot.texture_coords = 'UV'
+
+					if mat.alpha < 1.0:
+						mat.use_transparency=self.use_transparency
+						mat.transparency_method=self.transparency_method
+						obj.bl_obj.show_transparent = self.display_transparency
+						
+					mesh.materials.append(mat)
+
 
 			for i in range(facesnum):
 				f = obj.flist_cfg[i]
@@ -746,10 +770,12 @@ class AC3DImport:
 				bface = mesh.faces[i]
 
 				bface.use_smooth = is_smooth
-				mesh.show_double_sided = self.show_double_sided
 
 				bface.material_index = objmat_indices.index(fmat)
-
+#				mat = bmat[fmat]
+#				if not mat.name in mesh.materials:
+#					mesh.materials.append(mat)				
+								
 				fuv = obj.flist_uv[i]
 				if obj.texoff:
 					uoff = obj.texoff[0]
@@ -762,10 +788,17 @@ class AC3DImport:
 						uv[0] += uoff
 						uv[1] += voff
 
-				if uv_faces and img:
-					uf = uv_faces[i]
-					uf.image = img
-					uf.use_image = True
+				if uv_tex and img and len(fuv) <= 4:
+					nv = len(fuv)
+					uv_tex.data[i].uv1 = fuv[0]
+					uv_tex.data[i].uv2 = fuv[1]
+					uv_tex.data[i].uv3 = fuv[2]
+					if nv == 4:
+						uv_tex.data[i].uv4 = fuv[3]
+
+					uv_tex.data[i].image = img
+					uv_tex.data[i].use_image = True
+
 # majic79: Couldn't see how to implement this in the new model (yet) - left as commented code for the moment
 #				if img:
 #					bface.mode |= FACE_TEX
@@ -777,11 +810,6 @@ class AC3DImport:
 			
 #				muv.active = True
 #				muv.data.uv = fuv
-
-			mesh.calc_normals()
-
-			mesh.use_auto_smooth = self.use_auto_smooth
-			mesh.auto_smooth_angle = self.auto_smooth_angle
 
 			# subdiv: create SUBSURF modifier in Blender
 			if SUBDIV and obj.subdiv > 0:
@@ -795,6 +823,8 @@ class AC3DImport:
 				modif[Modifier.Settings.RENDLEVELS] = subdiv_render
 
 			obj_idx += 1
+
+			mesh.update(calc_edges=True)
 
 		self.build_hierarchy()
 		scene.update()
@@ -814,17 +844,21 @@ def read(operator,
 		transparency_shadows = False,
 		display_transparency = True,
 		):
-    inform("\nTrying to import AC3D model(s) from:\n%s ..." % filepath)
-    AC3DImport(
-		context,
-		filepath,
-		use_image_search,	
-		global_matrix,
-		use_auto_smooth,
-		auto_smooth_angle,
-		show_double_sided,
-		use_transparency,
-		transparency_method,
-		transparency_shadows,
-		display_transparency,
-		)
+
+	inform("\nTrying to import AC3D model(s) from:\n%s ..." % filepath)
+
+	AC3DImport(
+			context,
+			filepath,
+			use_image_search,	
+			global_matrix,
+			use_auto_smooth,
+			auto_smooth_angle,
+			show_double_sided,
+			use_transparency,
+			transparency_method,
+			transparency_shadows,
+			display_transparency,
+			)
+
+# End read

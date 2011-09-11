@@ -116,54 +116,26 @@ from bpy import *
 #from Blender import Object, Mesh, Material, Image, Mathutils, Registry
 #from Blender import sys as bsys
 
-# Globals
-REPORT_DATA = {
-	'main': [],
-	'errors': [],
-	'warns': [],
-	'nosplit': [],
-	'noexport': []
-}
+## Globals
+#REPORT_DATA = {
+#	'main': [],
+#	'errors': [],
+#	'warns': [],
+#	'nosplit': [],
+#	'noexport': []
+#}
 TOKENS_DONT_EXPORT = ['!', '#']
 TOKENS_DONT_SPLIT  = ['=', '$']
 
 MATIDX_ERROR = 0
 
 # flags:
-LOOSE = Mesh.EdgeFlags['LOOSE']
-FACE_TWOSIDED = Mesh.FaceModes['TWOSIDE']
-MESH_TWOSIDED = Mesh.Modes['TWOSIDED']
+#LOOSE = Mesh.EdgeFlags['LOOSE']
+#FACE_TWOSIDED = Mesh.FaceModes['TWOSIDE']
+#MESH_TWOSIDED = Mesh.Modes['TWOSIDED']
 
-REG_KEY = 'ac3d_export'
+#REG_KEY = 'ac3d_export'
 
-# config options:
-GLOBAL_COORDS = True
-SKIP_DATA = False
-MIRCOL_AS_AMB = False
-MIRCOL_AS_EMIS = False
-ADD_DEFAULT_MAT = True
-SET_TEX_DIR = True
-TEX_DIR = ''
-AC3D_4 = True # export crease value, compatible with AC3D 4 loaders
-NO_SPLIT = False
-ONLY_SELECTED = True
-EXPORT_DIR = ''
-PER_FACE_1_OR_2_SIDED = True
-
-tooltips = {
-	'GLOBAL_COORDS': "transform all vertices of all meshes to global coordinates",
-	'SKIP_DATA': "don't export mesh names as data fields",
-	'MIRCOL_AS_AMB': "export mirror color as ambient color",
-	'MIRCOL_AS_EMIS': "export mirror color as emissive color",
-	'ADD_DEFAULT_MAT': "always add a default white material",
-	'SET_TEX_DIR': "don't export default texture paths (edit also \"tex dir\")",
-	'EXPORT_DIR': "default / last folder used to export .ac files to",
-	'TEX_DIR': "(see \"set tex dir\") dir to prepend to all exported texture names (leave empty for no dir)",
-	'AC3D_4': "compatibility mode, adds 'crease' tag and slightly better material support",
-	'NO_SPLIT': "don't split meshes with multiple textures (or both textured and non textured polygons)",
-	'ONLY_SELECTED': "export only selected objects",
-	'PER_FACE_1_OR_2_SIDED': "override \"Double Sided\" button in favor of per face \"twosided\" attribute (UV Face Select mode)"
-}
 
 def update_RegistryInfo():
 	d = {}
@@ -300,9 +272,35 @@ class FooMesh:
 
 class AC3DExport: # the ac3d exporter part
 
-	def __init__(self, scene_objects, file):
+	def __init__(
+				self,
+				context,
+				filepath,
+				global_matrix,
+				only_selected,
+				use_smooth,
+				skip_data,
+				global_coords,
+				mircol_as_amb,
+				mircol_as_emis,
+				no_split,
+				):
+	
+		self.global_matrix = global_matrix
+		self.only_selected = only_selected
+		self.use_smooth = use_smooth
+		self.skip_data = skip_data
+		self.global_coords = global_coords
+		self.mircol_as_amb = mircol_as_amb
+		self.mircol_as_emis = mircol_as_emis
+		self.no_split = no_split
 
-		global ARG, SKIP_DATA, ADD_DEFAULT_MAT, DEFAULT_MAT
+		if self.only_selected:
+			self.objects = list(context.objects)
+		else:
+			objs = bpy.scene.objects
+
+#		global ARG, SKIP_DATA, ADD_DEFAULT_MAT, DEFAULT_MAT
 
 		header = 'AC3Db'
 		self.file = file
@@ -750,89 +748,55 @@ class AC3DExport: # the ac3d exporter part
 
 # End of Class AC3DExport
 
-from Blender.Window import FileSelector
+#def report_data():
+#	global VERBOSE
+#
+#	if not VERBOSE: return
+#
+#	d = REPORT_DATA
+#	msgs = {
+#		'0main': '%s\nExporting meshes to AC3D format' % str(19*'-'),
+#		'1warns': 'Warnings',
+#		'2errors': 'Errors',
+#		'3nosplit': 'Not split (because name starts with "=" or "$")',
+#		'4noexport': 'Not exported (because name starts with "!" or "#")'
+#	}
+#	if NO_SPLIT:
+#		l = msgs['3nosplit']
+#		l = "%s (because OPTION NO_SPLIT is set)" % l.split('(')[0] 
+#		msgs['3nosplit'] = l
+#	keys = msgs.keys()
+#	keys.sort()
+#	for k in keys:
+#		msgk = msgs[k]
+#		msg = '\n'.join(d[k[1:]])
+#		if msg:
+#			print '\n-%s:' % msgk
+#			print msg
 
-def report_data():
-	global VERBOSE
+def save(operator,
+		context,
+		filepath="",
+		global_matrix = None,
+		only_selection = False,
+		use_smooth = False,
+		skip_data = False,
+		global_coords = False,
+		mircol_as_amb = False,
+		mircol_as_emis = False,
+		no_split = True,
+		):
+    inform("\nTrying to export AC3D model(s) as:\n%s ..." % filepath)
+    AC3DExport(
+		context,
+		filepath,
+		global_matrix,
+		only_selected,
+		use_smooth,
+		skip_data,
+		global_coords,
+		mircol_as_amb,
+		mircol_as_emis,
+		no_split
+		)
 
-	if not VERBOSE: return
-
-	d = REPORT_DATA
-	msgs = {
-		'0main': '%s\nExporting meshes to AC3D format' % str(19*'-'),
-		'1warns': 'Warnings',
-		'2errors': 'Errors',
-		'3nosplit': 'Not split (because name starts with "=" or "$")',
-		'4noexport': 'Not exported (because name starts with "!" or "#")'
-	}
-	if NO_SPLIT:
-		l = msgs['3nosplit']
-		l = "%s (because OPTION NO_SPLIT is set)" % l.split('(')[0] 
-		msgs['3nosplit'] = l
-	keys = msgs.keys()
-	keys.sort()
-	for k in keys:
-		msgk = msgs[k]
-		msg = '\n'.join(d[k[1:]])
-		if msg:
-			print '\n-%s:' % msgk
-			print msg
-
-# File Selector callback:
-def fs_callback(filename):
-	global EXPORT_DIR, OBJS, CONFIRM_OVERWRITE, VERBOSE
-
-	if not filename.endswith('.ac'): filename = '%s.ac' % filename
-
-	if bsys.exists(filename) and CONFIRM_OVERWRITE:
-		if Blender.Draw.PupMenu('OVERWRITE?%t|File exists') != 1:
-			return
-
-	Blender.Window.WaitCursor(1)
-	starttime = bsys.time()
-
-	export_dir = bsys.dirname(filename)
-	if export_dir != EXPORT_DIR:
-		EXPORT_DIR = export_dir
-		update_RegistryInfo()
-
-	try:
-		file = open(filename, 'w')
-	except IOError, (errno, strerror):
-		error = "IOError #%s: %s" % (errno, strerror)
-		REPORT_DATA['errors'].append("Saving failed - %s." % error)
-		error_msg = "Couldn't save file!%%t|%s" % error
-		Blender.Draw.PupMenu(error_msg)
-		return
-
-	try:
-		test = AC3DExport(OBJS, file)
-	except:
-		file.close()
-		raise
-	else:
-		file.close()
-		endtime = bsys.time() - starttime
-		REPORT_DATA['main'].append("Done. Saved to: %s" % filename)
-		REPORT_DATA['main'].append("Data exported in %.3f seconds." % endtime)
-
-	if VERBOSE: report_data()
-	Blender.Window.WaitCursor(0)
-
-
-# -- End of definitions
-
-scn = Blender.Scene.GetCurrent()
-
-if ONLY_SELECTED:
-	OBJS = list(scn.objects.context)
-else:
-	OBJS = list(scn.objects)
-
-if not OBJS:
-	Blender.Draw.PupMenu('ERROR: no objects selected')
-else:
-	fname = bsys.makename(ext=".ac")
-	if EXPORT_DIR:
-		fname = bsys.join(EXPORT_DIR, bsys.basename(fname))
-	FileSelector(fs_callback, "Export AC3D", fname)
