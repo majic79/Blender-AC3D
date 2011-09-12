@@ -20,7 +20,7 @@ Go to File->Import->AC3D (.ac), select a file and let it do the work
 
 Known Issues:
 
-	- Textures don't seem to work
+	- Polygon faces with number of vertices>4 don't import
 	- Export non-functional
 
 Acknowledgments:
