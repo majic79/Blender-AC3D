@@ -58,6 +58,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 	'''Import from AC3D file format (.ac)'''
 	bl_idname = 'import_mesh.import_ac3d'
 	bl_label = 'Import AC3D'
+	bl_options = {'PRESET'}
 
 	filename_ext = '.ac'
 	filter_glob = StringProperty(default='*.ac', options={'HIDDEN'})
@@ -155,6 +156,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 #	'''Export to AC3D file format (.ac)'''
 #	bl_idname = 'export_mesh.AC3D'
 #	bl_label = 'Export AC3D'
+#	bl_options = {'PRESET'}
 #
 #	filename_ext = '.ac'
 #
