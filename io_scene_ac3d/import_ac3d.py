@@ -91,6 +91,7 @@ class AcObj:
 						}
 
 		self.read_ac_object(ac_file)
+		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.texture, self.loc, self.rot, self.url))
 
 	'''
 	Read the object lines and dump them into this object, making hierarchial attachments to parents
@@ -104,7 +105,7 @@ class AcObj:
 			toks = line.strip().split()
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
-					TRACE("\t{ln}".format(ln=line.strip()))
+#					TRACE("\t{ln}".format(ln=line.strip()))
 					self.tokens[toks[0]](ac_file,toks)
 				else:
 					bDone = True
@@ -113,9 +114,9 @@ class AcObj:
 		vertex_count = int(toks[1])
 		for n in range(vertex_count):
 			line = ac_file.readline()
-			TRACE("\t\t{ln}".format(ln=line.strip()))
+#			TRACE("\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
-			self.vert_list.append(list(map(float,line)))
+			self.vert_list.append([float(x) for x in line])
 
 	def read_surfaces(self, ac_file, toks):
 		surf_count = int(toks[1])
@@ -125,7 +126,7 @@ class AcObj:
 			if line=='':
 				break
 
-			TRACE("\t\t{ln}".format(ln=line.strip()))
+#			TRACE("\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				self.surf_list.append(AcSurf(line[1],ac_file))
@@ -135,7 +136,6 @@ class AcObj:
 
 	def read_data(self, ac_file, toks):
 		line = ac_file.readline()
-		TRACE("\t\t{ln}".format(ln=line.strip()))
 		self.data=line[:int(toks[1])]
 
 	def read_children(self, ac_file, toks):
@@ -144,7 +144,7 @@ class AcObj:
 			line = ac_file.readline()
 			if line == '':
 				break			
-			TRACE("\t{ln}".format(ln=line.strip()))
+#			TRACE("\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 			self.children.append(AcObj(line[1],ac_file,self))
 
@@ -182,6 +182,7 @@ class AcSurf:
 						'refs':	self.read_surf_refs,
 						}
 		self.read_ac_surfaces(ac_file)
+		TRACE("Created surface: {0}".format(self.flags))
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
@@ -192,7 +193,7 @@ class AcSurf:
 			toks = line.split()
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
-					TRACE("\t\t{ln}".format(ln=line.strip()))
+#					TRACE("\t\t{ln}".format(ln=line.strip()))
 					surf_done = self.tokens[toks[0]](ac_file,toks)
 				else:
 					surf_done = True
@@ -205,12 +206,13 @@ class AcSurf:
 		num_refs = int(tokens[1])
 		for n in range(num_refs):
 			line = ac_file.readline()
-			TRACE("\t\t\t{ln}".format(ln=line.strip()))
+#			TRACE("\t\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
-			self.refs.append([int(line[0]),[float(line[1]),float(line[2])]])
+		
+			self.refs.append([int(line[0]),[float(x) for x in line[:2]]])
 		return True
 
-
+		
 class ImportAC3D:
 
 	class AcMat:
@@ -218,6 +220,8 @@ class ImportAC3D:
 		Container class that defines the material properties of the .ac MATERIAL
 		'''
 		def __init__(self, name, rgb, amb, emis, spec, shi, trans):
+			if name == "":
+				name = "Default"
 			self.name = name			# string
 			self.rgb = rgb				# [R,G,B]
 			self.amb = amb				# [R,G,B]
@@ -226,8 +230,69 @@ class ImportAC3D:
 			self.shi = shi				# integer
 			self.trans = trans			# float
 
+			self.bmat_keys = {}			# dictionary list of blender materials
+			self.bmat = []				# list of valid blender materials
+			TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
+		'''
+		looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
+		'''
+		def get_blender_material(self,texture=''):		
+			bl_mat = None
+			tex_slot = None
+			if texture in self.bmat_keys:
+				bl_mat = self.bmat_keys[texture]
+			else:
+				bl_mat = bpy.data.materials.new(self.name)
+				bl_mat.diffuse_color = self.rgb
+				bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+				bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+				bl_mat.specular_color = self.spec
+				bl_mat.specular_intensity = float(self.shi) / 100
+				bl_mat.alpha = self.trans
+				if texture != '':
+					tex_slot = blmat.texture_slots.add()
+					tex_slot.uv_texture = self.get_blender_texture(texture)
 
+				self.bmat_keys[texture] = self.bmat.append(bl_mat)
+			return bl_mat
+
+		'''
+		looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
+		'''
+		def get_blender_image(self, texture):
+			bl_image = None
+			if texture in bpy.data.images:
+				bl_image = bpy.data.images(texture)
+			else:
+				texture_path = None
+				if os.path.exists(texture):
+					texture_path = texture
+				elif os.path.exists(os.path.join(ImportAC3D.importdir, texture)):
+					texture_path = os.path.join(ImportAC3D.importdir, texture)
 			
+				if texture_path:
+					TRACE("Loading texture: {0}".format(texture_path))
+					try:
+						bl_image = bpy.data.images.load(texture_path)
+					except:
+						TRACE("Failed to load texture: {0}".format(texture))
+
+			return bl_image
+
+		'''
+		looks for the blender texture, adds it if it doesn't exist
+		'''
+		def get_blender_texture(self, texture):
+			bl_tex = None
+			if texture in bpy.data.textures:
+				bl_tex = bpy.data.textures(texture)
+			else:
+				bl_tex = bpy.data.textures.add(texture, 'IMAGE')
+				bl_tex.image = self.get_blender_image(texture)
+				bl_tex.use_preview_alpha = True
+
+			return bl_tex
+
 	def __init__(
 			self,
 			operator,
@@ -291,6 +356,8 @@ class ImportAC3D:
 
 		ac_file.close()
 
+		self.create_blender_data()
+
 		return None
 
 	'''
@@ -309,7 +376,7 @@ class ImportAC3D:
 			# See if this is a valid token and pass the file handle and the current line to our function
 			if len(toks) > 0:
 				if toks[0] in self.tokens.keys():
-					TRACE("*\t{ln}".format(ln=line.strip()))
+#					TRACE("*\t{ln}".format(ln=line.strip()))
 					self.tokens[toks[0]](ac_file,toks)
 				else:
 					self.report_error("invalid token: {tok} ({ln})".format(tok=toks[0], ln=line.strip()))
@@ -323,7 +390,14 @@ class ImportAC3D:
 
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
 
-		self.matlist.append(self.AcMat(line[1],line[3:5],line[7:9],line[11:13],line[15:17],line[19],line[21]))
+		self.matlist.append(self.AcMat(line[1].strip('"'),
+						[float(x) for x in line[3:6]],
+						[float(x) for x in line[7:10]],
+						[float(x) for x in line[11:14]],
+						[float(x) for x in line[15:18]],
+						int(line[19]),
+						float(line[21])
+						))
 
 	'''
 	Read the Object definition (including child objects)
@@ -331,4 +405,12 @@ class ImportAC3D:
 	def read_object(self, ac_file, line):
 		# OBJECT %s
 		self.oblist.append(AcObj(line[1], ac_file))
+
+	'''
+	Reads the data imported from the file and creates blender data
+	'''
+	def create_blender_data(self):
+		
+		for ac_mat in self.matlist:
+			ac_mat.get_blender_material()
 
