@@ -97,15 +97,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							description="treats all set-smoothed faces with angles less than the specified angle as 'smooth' during render",
 							default=False
 						)
-
-	auto_smooth_angle = FloatProperty(
-							name="Auto Smooth Angle",
-							description="Defines maximum angle between face normals that 'Auto Smooth' will operate on",
-							subtype="ANGLE",
-							min=radians(1),
-							max=radians(80),
-							default=80,
-						)
+	#auto smooth angle will be defined by "crease" property
 	use_transparency = BoolProperty(
 							name="Use Transparency",
 							description="Enable transparency for rendering if material alpha < 1.0",
@@ -124,12 +116,17 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 	transparency_shadows = BoolProperty(
 							name="Transparency Shadows",
 							description="Allow shadows to pass through transparency",
-							default=False,
+							default=True,
 						)
 
 	display_transparency = BoolProperty(
 							name="Display Transparency",
 							description="Display transparency in materials with alpha < 1.0",
+							default=True,
+						)
+	use_emis_as_mircol = BoolProperty(
+							name="Use Emis as Mirror colour",
+							description="Use Emission colour as Mirror colour",
 							default=True,
 						)
 
@@ -149,129 +146,114 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 
 		print('Importing file', self.filepath)
 		t = time.mktime(datetime.datetime.now().timetuple())
-		import_ac3d.read(self, context, **keywords)
+		import_ac3d.ImportAC3D(self, context, **keywords)
 		t = time.mktime(datetime.datetime.now().timetuple()) - t
 		print('Finished importing in', t, 'seconds')
 		return {'FINISHED'}
 
-class ExportAC3D(bpy.types.Operator, ExportHelper):
-	'''Export to AC3D file format (.ac)'''
-	bl_idname = 'export_mesh.export_ac3d'
-	bl_label = 'Export AC3D'
-	bl_options = {'PRESET'}	
-
-	filename_ext = '.ac'
-
-	filter_glob = StringProperty(
-							default='*.ac',
-							options={'HIDDEN'}
-							)
-
-	axis_forward = EnumProperty(
-								name="Forward",
-								items=(('X', "X Forward", ""),
-									('Y', "Y Forward", ""),
-									('Z', "Z Forward", ""),
-									('-X', "-X Forward", ""),
-									('-Y', "-Y Forward", ""),
-									('-Z', "-Z Forward", ""),
-									),
-								default='Y',
-								)
-
-	axis_up = EnumProperty(
-							name="Up",
-							items=(('X', "X Up", ""),
-								('Y', "Y Up", ""),
-								('Z', "Z Up", ""),
-								('-X', "-X Up", ""),
-								('-Y', "-Y Up", ""),
-								('-Z', "-Z Up", ""),
-								),
-							default='Z',
-							)
-
-	use_selection = BoolProperty(
-							name="Selection Only",
-							description="Export selected objects only",
-							default=False,
-							)
-
-	skip_data = BoolProperty(
-							name="Skip Data",
-							description="don't export mesh names as data fields",
-							default=False,
-							)
-	global_coords = BoolProperty(
-							name="Global Co-ordinates",
-							description="Transform all vertices of all meshes to global coordinates",
-							default=False,
-							)
-	mircol_as_amb = BoolProperty(
-							name="Mirror col as Amb",
-							description="export mirror colour as ambient colour",
-							default=False,
-							)
-	mircol_as_emis = BoolProperty(
-							name="Mirror col as Emis",
-							description="export mirror colour as emissive colour",
-							default=False,
-							)
-	no_split = BoolProperty(
-							name="No Split",
-							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
-							default=True,
-							)
-# majic79: the below options aren't ported across
-#tooltips = {
-#	'ADD_DEFAULT_MAT': "always add a default white material",
-#	'SET_TEX_DIR': "don't export default texture paths (edit also \"tex dir\")",
-#	'EXPORT_DIR': "default / last folder used to export .ac files to",
-#	'TEX_DIR': "(see \"set tex dir\") dir to prepend to all exported texture names (leave empty for no dir)",
-#	'PER_FACE_1_OR_2_SIDED': "override \"Double Sided\" button in favor of per face \"twosided\" attribute (UV Face Select mode)"
-#}
-## config options:
-#ADD_DEFAULT_MAT = True
-#SET_TEX_DIR = True
-#TEX_DIR = ''
-#AC3D_4 = True # export crease value, compatible with AC3D 4 loaders
-#EXPORT_DIR = ''
-#PER_FACE_1_OR_2_SIDED = True
-
-	def execute(self, context):
-		from . import export_ac3d
-		keywords = self.as_keywords(ignore=("axis_forward",
-											"axis_up",
-											"filter_glob",
-											))
-
-		global_matrix = axis_conversion(to_forward=self.axis_forward,
-										to_up=self.axis_up,
-										).to_4x4()
-
-		keywords["global_matrix"] = global_matrix
-
-		print('Exporting file', self.filepath)
-		return export_ac3d.save(self, context, **keywords)
+#class ExportAC3D(bpy.types.Operator, ExportHelper):
+#	'''Export to AC3D file format (.ac)'''
+#	bl_idname = 'export_mesh.export_ac3d'
+#	bl_label = 'Export AC3D'
+#	bl_options = {'PRESET'}
+#
+#	filename_ext = '.ac'
+#
+#	filter_glob = StringProperty(
+#							default='*.ac',
+#							options={'HIDDEN'}
+#							)
+#
+#	axis_forward = EnumProperty(
+#								name="Forward",
+#								items=(('X', "X Forward", ""),
+#									('Y', "Y Forward", ""),
+#									('Z', "Z Forward", ""),
+#									('-X', "-X Forward", ""),
+#									('-Y', "-Y Forward", ""),
+#									('-Z', "-Z Forward", ""),
+#									),
+#								default='Y',
+#								)
+#
+#	axis_up = EnumProperty(
+#							name="Up",
+#							items=(('X', "X Up", ""),
+#								('Y', "Y Up", ""),
+#								('Z', "Z Up", ""),
+#								('-X', "-X Up", ""),
+#								('-Y', "-Y Up", ""),
+#								('-Z', "-Z Up", ""),
+#								),
+#							default='Z',
+#							)
+#
+#	use_selection = BoolProperty(
+#							name="Selection Only",
+#							description="Export selected objects only",
+#							default=False,
+#							)
+#
+#	skip_data = BoolProperty(
+#							name="Skip Data",
+#							description="don't export mesh names as data fields",
+#							default=False,
+#							)
+#	global_coords = BoolProperty(
+#							name="Global Co-ordinates",
+#							description="Transform all vertices of all meshes to global coordinates",
+#							default=False,
+#							)
+#	mircol_as_amb = BoolProperty(
+#							name="Mirror col as Amb",
+#							description="export mirror colour as ambient colour",
+#							default=False,
+#							)
+#	mircol_as_emis = BoolProperty(
+#							name="Mirror col as Emis",
+#							description="export mirror colour as emissive colour",
+#							default=False,
+#							)
+#	no_split = BoolProperty(
+#							name="No Split",
+#							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
+#							default=True,
+#							)
+#
+#	def execute(self, context):
+#		from . import export_ac3d
+#		keywords = self.as_keywords(ignore=("axis_forward",
+#											"axis_up",
+#											"filter_glob",
+#											))
+#
+#		global_matrix = axis_conversion(to_forward=self.axis_forward,
+#										to_up=self.axis_up,
+#										).to_4x4()
+#
+#		keywords["global_matrix"] = global_matrix
+#
+#		print('Exporting file', self.filepath)
+#		return export_ac3d.save(self, context, **keywords)
 
 
 def menu_func_import(self, context):
 	self.layout.operator(ImportAC3D.bl_idname, text='AC3D (.ac)')
 
 
-def menu_func_export(self, context):
-	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
+#def menu_func_export(self, context):
+#	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
 
 
 def register():
 	bpy.utils.register_module(__name__)
 	bpy.types.INFO_MT_file_import.append(menu_func_import)
-	bpy.types.INFO_MT_file_export.append(menu_func_export)
+#	bpy.types.INFO_MT_file_export.append(menu_func_export)
 
 def unregister():
 	bpy.utils.unregister_module(__name__)
 	bpy.types.INFO_MT_file_import.remove(menu_func_import)
-	bpy.types.INFO_MT_file_export.remove(menu_func_export)
+#	bpy.types.INFO_MT_file_export.remove(menu_func_export)
 
 if __name__ == "__main__":
 	register()
