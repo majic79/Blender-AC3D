@@ -25,9 +25,9 @@
 bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "AC3D model importer for blender.",
-	"author": "Willian P. Germano, Chris Marr",
-	"version": (1,0),
-	"blender" : (2,5,7),
+	"author": "Chris Marr, Rene Negre",
+	"version": (2,0),
+	"blender" : (2,5,9),
 	"api": 36079,
 	"location": "File > Import-Export",
 	"warning": "",
@@ -42,8 +42,8 @@ if "bpy" in locals():
 	import imp
 	if 'import_ac3d' in locals():
 		imp.reload(import_ac3d)
-#	if 'export_ac3d' in locals():
-#		imp.reload(export_ac3d)
+	if 'export_ac3d' in locals():
+		imp.reload(export_ac3d)
 
 import time
 import datetime
@@ -151,109 +151,108 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 		print('Finished importing in', t, 'seconds')
 		return {'FINISHED'}
 
-#class ExportAC3D(bpy.types.Operator, ExportHelper):
-#	'''Export to AC3D file format (.ac)'''
-#	bl_idname = 'export_mesh.export_ac3d'
-#	bl_label = 'Export AC3D'
-#	bl_options = {'PRESET'}
-#
-#	filename_ext = '.ac'
-#
-#	filter_glob = StringProperty(
-#							default='*.ac',
-#							options={'HIDDEN'}
-#							)
-#
-#	axis_forward = EnumProperty(
-#								name="Forward",
-#								items=(('X', "X Forward", ""),
-#									('Y', "Y Forward", ""),
-#									('Z', "Z Forward", ""),
-#									('-X', "-X Forward", ""),
-#									('-Y', "-Y Forward", ""),
-#									('-Z', "-Z Forward", ""),
-#									),
-#								default='Y',
-#								)
-#
-#	axis_up = EnumProperty(
-#							name="Up",
-#							items=(('X', "X Up", ""),
-#								('Y', "Y Up", ""),
-#								('Z', "Z Up", ""),
-#								('-X', "-X Up", ""),
-#								('-Y', "-Y Up", ""),
-#								('-Z', "-Z Up", ""),
-#								),
-#							default='Z',
-#							)
-#
-#	use_selection = BoolProperty(
-#							name="Selection Only",
-#							description="Export selected objects only",
-#							default=False,
-#							)
-#
-#	skip_data = BoolProperty(
-#							name="Skip Data",
-#							description="don't export mesh names as data fields",
-#							default=False,
-#							)
-#	global_coords = BoolProperty(
-#							name="Global Co-ordinates",
-#							description="Transform all vertices of all meshes to global coordinates",
-#							default=False,
-#							)
-#	mircol_as_amb = BoolProperty(
-#							name="Mirror col as Amb",
-#							description="export mirror colour as ambient colour",
-#							default=False,
-#							)
-#	mircol_as_emis = BoolProperty(
-#							name="Mirror col as Emis",
-#							description="export mirror colour as emissive colour",
-#							default=False,
-#							)
-#	no_split = BoolProperty(
-#							name="No Split",
-#							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
-#							default=True,
-#							)
-#
-#	def execute(self, context):
-#		from . import export_ac3d
-#		keywords = self.as_keywords(ignore=("axis_forward",
-#											"axis_up",
-#											"filter_glob",
-#											))
-#
-#		global_matrix = axis_conversion(to_forward=self.axis_forward,
-#										to_up=self.axis_up,
-#										).to_4x4()
-#
-#		keywords["global_matrix"] = global_matrix
-#
-#		print('Exporting file', self.filepath)
-#		return export_ac3d.save(self, context, **keywords)
+class ExportAC3D(bpy.types.Operator, ExportHelper):
+	'''Export to AC3D file format (.ac)'''
+	bl_idname = 'export_mesh.export_ac3d'
+	bl_label = 'Export AC3D'
+	bl_options = {'PRESET'}
 
+	filename_ext = '.ac'
+
+	filter_glob = StringProperty(
+							default='*.ac',
+							options={'HIDDEN'}
+							)
+
+	axis_forward = EnumProperty(
+								name="Forward",
+								items=(('X', "X Forward", ""),
+									('Y', "Y Forward", ""),
+									('Z', "Z Forward", ""),
+									('-X', "-X Forward", ""),
+									('-Y', "-Y Forward", ""),
+									('-Z', "-Z Forward", ""),
+									),
+								default='Y',
+								)
+
+	axis_up = EnumProperty(
+							name="Up",
+							items=(('X', "X Up", ""),
+								('Y', "Y Up", ""),
+								('Z', "Z Up", ""),
+								('-X', "-X Up", ""),
+								('-Y', "-Y Up", ""),
+								('-Z', "-Z Up", ""),
+								),
+							default='Z',
+							)
+
+	use_selection = BoolProperty(
+							name="Selection Only",
+							description="Export selected objects only",
+							default=False,
+							)
+
+	skip_data = BoolProperty(
+							name="Skip Data",
+							description="don't export mesh names as data fields",
+							default=False,
+							)
+	global_coords = BoolProperty(
+							name="Global Co-ordinates",
+							description="Transform all vertices of all meshes to global coordinates",
+							default=False,
+							)
+	mircol_as_amb = BoolProperty(
+							name="Mirror col as Amb",
+							description="export mirror colour as ambient colour",
+							default=False,
+							)
+	mircol_as_emis = BoolProperty(
+							name="Mirror col as Emis",
+							description="export mirror colour as emissive colour",
+							default=False,
+							)
+	no_split = BoolProperty(
+							name="No Split",
+							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
+							default=True,
+							)
+
+	def execute(self, context):
+		from . import export_ac3d
+		keywords = self.as_keywords(ignore=("axis_forward",
+											"axis_up",
+											"filter_glob",
+											))
+
+		global_matrix = axis_conversion(to_forward=self.axis_forward,
+										to_up=self.axis_up,
+										).to_4x4()
+
+		keywords["global_matrix"] = global_matrix
+
+		print('Exporting file', self.filepath)
+		return export_ac3d.save(self, context, **keywords)
 
 def menu_func_import(self, context):
 	self.layout.operator(ImportAC3D.bl_idname, text='AC3D (.ac)')
 
 
-#def menu_func_export(self, context):
-#	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
+def menu_func_export(self, context):
+	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
 
 
 def register():
 	bpy.utils.register_module(__name__)
 	bpy.types.INFO_MT_file_import.append(menu_func_import)
-#	bpy.types.INFO_MT_file_export.append(menu_func_export)
+	bpy.types.INFO_MT_file_export.append(menu_func_export)
 
 def unregister():
 	bpy.utils.unregister_module(__name__)
 	bpy.types.INFO_MT_file_import.remove(menu_func_import)
-#	bpy.types.INFO_MT_file_export.remove(menu_func_export)
+	bpy.types.INFO_MT_file_export.remove(menu_func_export)
 
 if __name__ == "__main__":
 	register()
