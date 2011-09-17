@@ -53,7 +53,7 @@ Container class for a .ac OBJECT
 class AcObj:
 	def __init__(self, ob_type, ac_file, parent = None):
 		self.type = ob_type			# Type of object
-		self.parent = parent		# reference to the parent object (if the object is World, then this should be None)
+		self.ac_parent = parent		# reference to the parent object (if the object is World, then this should be None)
 		self.name = ''				# name of the object
 		self.data = ''				# custom data
 		self.texture = ''			# texture (filepath)
@@ -65,15 +65,10 @@ class AcObj:
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
+		self.face_list = []
 		self.children = []
 
-		self.flist_cfg = []
-		self.flist_v = []
-		self.flist_uv = []
-		self.elist = []
-		self.matlist = []
-
-		self.b_obj = None			# Blender object
+		self.bl_obj = None			# Blender object
 
 		self.tokens =	{
 						'numvert':	self.read_vertices,
@@ -106,7 +101,7 @@ class AcObj:
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
 #					TRACE("\t{ln}".format(ln=line.strip()))
-					self.tokens[toks[0]](ac_file,toks)
+					bDone = self.tokens[toks[0]](ac_file,toks)
 				else:
 					bDone = True
 
@@ -132,11 +127,45 @@ class AcObj:
 				self.surf_list.append(AcSurf(line[1],ac_file))
 
 	def read_name(self, ac_file, toks):
-		self.name=toks[1]
+		self.name=toks[1].strip('"')
+		return False
 
 	def read_data(self, ac_file, toks):
 		line = ac_file.readline()
 		self.data=line[:int(toks[1])]
+		return False
+
+	def read_location(self, ac_file, toks):
+		self.loc=[0,0,0]
+		return False
+
+	def read_rotation(self, ac_file, toks):
+		self.rot = Matrix([
+							[float(x) for x in toks[1:4]],
+							[float(x) for x in toks[4:7]],
+							[float(x) for x in toks[7:9]],
+							])	# 3x3 rotational matrix for vertices
+		return False
+
+	def read_texture(self, ac_file, toks):
+		self.texture=toks[1]
+		return False
+
+	def read_texrep(self, ac_file, toks):
+		self.texrep=toks[1:2]
+		return False
+
+	def read_texoff(self, ac_file, toks):
+		self.texoff=toks[1:2]
+		return False
+
+	def read_subdiv(self, ac_file, toks):
+		self.subdiv=int(toks[1])
+		return False
+
+	def read_crease(self, ac_file, toks):
+		self.crease=float(toks[1])
+		return False
 
 	def read_children(self, ac_file, toks):
 		num_kids = int(toks[1])
@@ -146,28 +175,51 @@ class AcObj:
 				break			
 #			TRACE("\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
-			self.children.append(AcObj(line[1],ac_file,self))
+			self.children.append(AcObj(line[1].strip('"'),ac_file,self))
+		# This is assumed to be the last thing in the list of things to read
+		# returning True indicates to cease parsing this object
+		return True
 
-	def read_location(self, ac_file, toks):
-		self.loc=[0,0,0]
+	'''
+	This function does the work of creating an object in blender and configuring it correctly
+	'''
+	def create_blender_object(self, ac_matlist, import_config):
 
-	def read_rotation(self, ac_file, toks):
-		self.rot = Matrix([toks[1:3],toks[4:6],toks[7:9]])	# 3x3 rotational matrix for vertices
+		bl_mesh = None
+		if self.type == 'group':
+			# Create an empty object
+			self.bl_obj = bpy.data.objects.new(self.name, None)
+#			import_config.context.scene.objects.link(self.bl_obj)
 
-	def read_texture(self, ac_file, toks):
-		self.texture=toks[1]
+		if self.type == 'light':
+			bl_lamp = bpy.data.lamps.new(self.name)
+			self.bl_obj = bpy.data.objects.new(self.name, bl_lamp)
 
-	def read_texrep(self, ac_file, toks):
-		self.texrep=toks[1:2]
+		if self.type == 'poly':
+			bl_mesh = bpy.data.meshes.new(self.name)
+			self.bl_obj = bpy.data.objects.new(self.name, bl_mesh)
 
-	def read_texoff(self, ac_file, toks):
-		self.texoff=toks[1:2]
+		if self.vert_list and bl_mesh:
+			# make sure we have some vertices
+			face_list = []
+			for surf in self.surf_list:
+				face_list.append(surf.refs)
+				bl_material = ac_matlist[surf.mat_index].get_blender_material(import_config, self.texture)
+				bl_mesh.materials.append(bl_material)
+			
+			bl_mesh.from_pydata(self.vert_list, [], face_list)
+			self.bl_obj.show_transparent = import_config.display_transparency
+			bl_mesh.calc_normals()
 
-	def read_subdiv(self, ac_file, toks):
-		self.subdiv=int(toks[1])
+			bl_mesh.update(calc_edges=True)
 
-	def read_crease(self, ac_file, toks):
-		self.crease=float(toks[1])
+		# Add any children
+		for obj in self.children:
+			obj.create_blender_object(ac_matlist, import_config)
+			obj.bl_obj.parent = self.bl_obj
+			if self.type == 'world':
+				import_config.context.scene.objects.link(obj.bl_obj)
+			
 
 '''
 Container class for surface definition within a parent object
@@ -175,14 +227,15 @@ Container class for surface definition within a parent object
 class AcSurf:
 	def __init__(self, flags, ac_file):
 		self.flags = flags			# surface flags
-		self.mat = 0				# default material
+		self.mat_index = 0				# default material
 		self.refs = []				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
+		self.uv_refs = []
 		self.tokens =	{
 						'mat':	self.read_surf_material,
 						'refs':	self.read_surf_refs,
 						}
 		self.read_ac_surfaces(ac_file)
-		TRACE("Created surface: {0}".format(self.flags))
+#		TRACE("Created surface: {0} {1} ({2})".format(self.flags, self.mat_index, len(self.refs)))
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
@@ -199,7 +252,7 @@ class AcSurf:
 					surf_done = True
 			
 	def read_surf_material(self, ac_file, tokens):
-		self.mat = int(tokens[1])
+		self.mat_index = int(tokens[1])
 		return False
 	
 	def read_surf_refs(self, ac_file, tokens):
@@ -209,90 +262,126 @@ class AcSurf:
 #			TRACE("\t\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 		
-			self.refs.append([int(line[0]),[float(x) for x in line[:2]]])
+			self.refs.append(int(line[0]))
+			self.uv_refs.append([float(x) for x in line[1:3]])
 		return True
 
+class AcMat:
+	'''
+	Container class that defines the material properties of the .ac MATERIAL
+	'''
+	def __init__(self, name, rgb, amb, emis, spec, shi, trans):
+		if name == "":
+			name = "Default"
+		self.name = name			# string
+		self.rgb = rgb				# [R,G,B]
+		self.amb = amb				# [R,G,B]
+		self.emis = emis			# [R,G,B]
+		self.spec = spec			# [R,G,B]
+		self.shi = shi				# integer
+		self.trans = trans			# float
+
+		self.bmat_keys = {}			# dictionary list of blender materials
+		self.bmat = []				# list of valid blender materials
+		TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
+	'''
+	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
+	'''
+	def get_blender_material(self, import_config, texture=''):
+		bl_mat = None
+		tex_slot = None
+		if texture in self.bmat_keys:
+			bl_mat = self.bmat_keys[texture]
+		else:
+			bl_mat = bpy.data.materials.new(self.name)
+			bl_mat.diffuse_color = self.rgb
+			bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+			bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+			bl_mat.specular_color = self.spec
+			bl_mat.specular_intensity = float(self.shi) / 100
+			bl_mat.alpha = (1.0 - self.trans)
+			if bl_mat.alpha < 1.0:
+				bl_mat.use_transparency = import_config.use_transparency
+				bl_mat.transparency_method = import_config.transparency_method
+				
+			if texture != '':
+				tex_slot = bl_mat.texture_slots.add()
+				tex_slot.texture = self.get_blender_texture(import_config, texture)
+
+			self.bmat_keys[texture] = self.bmat.append(bl_mat)
+		return bl_mat
+
+	'''
+	looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
+	'''
+	def get_blender_image(self, import_config, texture):
+		bl_image = None
+		if texture in bpy.data.images:
+			bl_image = bpy.data.images[texture]
+		else:
+			texture_path = None
+			if os.path.exists(texture):
+				texture_path = texture
+			elif os.path.exists(os.path.join(import_config.importdir, texture)):
+				texture_path = os.path.join(import_config.importdir, texture)
 		
+			if texture_path:
+				TRACE("Loading texture: {0}".format(texture_path))
+				try:
+					bl_image = bpy.data.images.load(texture_path)
+				except:
+					TRACE("Failed to load texture: {0}".format(texture))
+
+		return bl_image
+
+	'''
+	looks for the blender texture, adds it if it doesn't exist
+	'''
+	def get_blender_texture(self, import_config, texture):
+		bl_tex = None
+		if texture in bpy.data.textures:
+			bl_tex = bpy.data.textures[texture]
+		else:
+			bl_tex = bpy.data.textures.new(texture, 'IMAGE')
+			bl_tex.image = self.get_blender_image(import_config, texture)
+			bl_tex.use_preview_alpha = True
+
+		return bl_tex
+
+class ImportConf:
+	def __init__(
+			self,
+			operator,
+			context,
+			filepath,
+			use_image_search,
+			global_matrix,
+			use_auto_smooth,
+			show_double_sided,
+			use_transparency,
+			transparency_method,
+			transparency_shadows,
+			display_transparency,
+			use_emis_as_mircol,
+			use_subsurf,
+			):
+		# Stuff that needs to be available to the working classes (ha!)
+		self.operator = operator
+		self.context = context
+		self.global_matrix = global_matrix
+		self.use_image_search = use_image_search
+		self.use_auto_smooth = use_auto_smooth
+		self.show_double_sided = show_double_sided
+		self.use_transparency = use_transparency
+		self.transparency_method = transparency_method
+		self.transparency_shadows = transparency_shadows
+		self.display_transparency = display_transparency
+		self.use_emis_as_mircol = use_emis_as_mircol
+
+		# used to determine relative file paths
+		self.importdir = os.path.dirname(filepath)
+	
 class ImportAC3D:
-
-	class AcMat:
-		'''
-		Container class that defines the material properties of the .ac MATERIAL
-		'''
-		def __init__(self, name, rgb, amb, emis, spec, shi, trans):
-			if name == "":
-				name = "Default"
-			self.name = name			# string
-			self.rgb = rgb				# [R,G,B]
-			self.amb = amb				# [R,G,B]
-			self.emis = emis			# [R,G,B]
-			self.spec = spec			# [R,G,B]
-			self.shi = shi				# integer
-			self.trans = trans			# float
-
-			self.bmat_keys = {}			# dictionary list of blender materials
-			self.bmat = []				# list of valid blender materials
-			TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
-		'''
-		looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
-		'''
-		def get_blender_material(self,texture=''):		
-			bl_mat = None
-			tex_slot = None
-			if texture in self.bmat_keys:
-				bl_mat = self.bmat_keys[texture]
-			else:
-				bl_mat = bpy.data.materials.new(self.name)
-				bl_mat.diffuse_color = self.rgb
-				bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
-				bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
-				bl_mat.specular_color = self.spec
-				bl_mat.specular_intensity = float(self.shi) / 100
-				bl_mat.alpha = self.trans
-				if texture != '':
-					tex_slot = blmat.texture_slots.add()
-					tex_slot.uv_texture = self.get_blender_texture(texture)
-
-				self.bmat_keys[texture] = self.bmat.append(bl_mat)
-			return bl_mat
-
-		'''
-		looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
-		'''
-		def get_blender_image(self, texture):
-			bl_image = None
-			if texture in bpy.data.images:
-				bl_image = bpy.data.images(texture)
-			else:
-				texture_path = None
-				if os.path.exists(texture):
-					texture_path = texture
-				elif os.path.exists(os.path.join(ImportAC3D.importdir, texture)):
-					texture_path = os.path.join(ImportAC3D.importdir, texture)
-			
-				if texture_path:
-					TRACE("Loading texture: {0}".format(texture_path))
-					try:
-						bl_image = bpy.data.images.load(texture_path)
-					except:
-						TRACE("Failed to load texture: {0}".format(texture))
-
-			return bl_image
-
-		'''
-		looks for the blender texture, adds it if it doesn't exist
-		'''
-		def get_blender_texture(self, texture):
-			bl_tex = None
-			if texture in bpy.data.textures:
-				bl_tex = bpy.data.textures(texture)
-			else:
-				bl_tex = bpy.data.textures.add(texture, 'IMAGE')
-				bl_tex.image = self.get_blender_image(texture)
-				bl_tex.use_preview_alpha = True
-
-			return bl_tex
-
 	def __init__(
 			self,
 			operator,
@@ -310,21 +399,22 @@ class ImportAC3D:
 			use_subsurf=True,
 			):
 
-		# Stuff that needs to be available to the rest of the working class
-		self.operator = operator
-		self.context = context
-		self.global_matrix = global_matrix
-		self.use_image_search = use_image_search
-		self.use_auto_smooth = use_auto_smooth
-		self.show_double_sided = show_double_sided
-		self.use_transparency = use_transparency
-		self.transparency_method = transparency_method
-		self.transparency_shadows = transparency_shadows
-		self.display_transparency = display_transparency
-		self.use_emis_as_mircol = use_emis_as_mircol
+		self.import_config = ImportConf(
+										operator,
+										context,
+										filepath,
+										use_image_search,
+										global_matrix,
+										use_auto_smooth,
+										show_double_sided,
+										use_transparency,
+										transparency_method,
+										transparency_shadows,
+										display_transparency,
+										use_emis_as_mircol,
+										use_subsurf,
+										)
 
-		# used to determine relative file paths
-		self.importdir = os.path.dirname(filepath)
 
 		self.tokens = 	{
 						'MATERIAL':		self.read_material,
@@ -390,7 +480,7 @@ class ImportAC3D:
 
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
 
-		self.matlist.append(self.AcMat(line[1].strip('"'),
+		self.matlist.append(AcMat(line[1].strip('"'),
 						[float(x) for x in line[3:6]],
 						[float(x) for x in line[7:10]],
 						[float(x) for x in line[11:14]],
@@ -404,13 +494,14 @@ class ImportAC3D:
 	'''
 	def read_object(self, ac_file, line):
 		# OBJECT %s
-		self.oblist.append(AcObj(line[1], ac_file))
+		self.oblist.append(AcObj(line[1].strip('"'), ac_file))
 
 	'''
 	Reads the data imported from the file and creates blender data
 	'''
 	def create_blender_data(self):
-		
-		for ac_mat in self.matlist:
-			ac_mat.get_blender_material()
+
+		# go through the list of objects
+		for obj in self.oblist:
+			obj.create_blender_object(self.matlist, self.import_config)
 
