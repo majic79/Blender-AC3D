@@ -23,6 +23,7 @@ import struct
 import bpy
 import mathutils
 from math import radians
+from collections import defaultdict
 from bpy import *
 from bpy_extras.image_utils import load_image
 
@@ -86,7 +87,7 @@ class AcObj:
 						}
 
 		self.read_ac_object(ac_file)
-		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.texture, self.loc, self.rot, self.url))
+#		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.texture, self.loc, self.rot, self.url))
 
 	'''
 	Read the object lines and dump them into this object, making hierarchial attachments to parents
@@ -148,7 +149,7 @@ class AcObj:
 		return False
 
 	def read_texture(self, ac_file, toks):
-		self.texture=toks[1]
+		self.texture=toks[1].strip('"')
 		return False
 
 	def read_texrep(self, ac_file, toks):
@@ -183,10 +184,12 @@ class AcObj:
 	'''
 	This function does the work of creating an object in blender and configuring it correctly
 	'''
-	def create_blender_object(self, ac_matlist, import_config):
+	def create_blender_object(self, ac_matlist, import_config, str_pre, bLevelLinked):
 
+		if self.type == 'world':
+			self.name = import_config.ac_name
 		bl_mesh = None
-		if self.type == 'group':
+		if self.type == 'group' or self.type == 'world':
 			# Create an empty object
 			self.bl_obj = bpy.data.objects.new(self.name, None)
 #			import_config.context.scene.objects.link(self.bl_obj)
@@ -202,23 +205,45 @@ class AcObj:
 		if self.vert_list and bl_mesh:
 			# make sure we have some vertices
 			face_list = []
+			bl_mat_dict = {}
 			for surf in self.surf_list:
 				face_list.append(surf.refs)
-				bl_material = ac_matlist[surf.mat_index].get_blender_material(import_config, self.texture)
-				bl_mesh.materials.append(bl_material)
+				# Material index is 1 based, the list we built is 0 based
+				ac_material = ac_matlist[surf.mat_index-1]
+				bl_material = ac_material.get_blender_material(import_config, self.texture)
+				if bl_material == None:
+					TRACE("{0}".format(len(ac_matlist)))
+					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.texture))
+
+#				TRACE("Using Material Index {0}".format(surf.mat_index))
+#				if not bl_material.name in bl_mesh.materials:
+#					bl_mesh.materials.append(bl_material)
 			
 			bl_mesh.from_pydata(self.vert_list, [], face_list)
 			self.bl_obj.show_transparent = import_config.display_transparency
-			bl_mesh.calc_normals()
 
-			bl_mesh.update(calc_edges=True)
+		import_config.context.scene.objects.link(self.bl_obj)
+
+		TRACE("{0}+-{1}".format(str_pre, self.name))
 
 		# Add any children
+		str_pre_new = ""
+		bUseLink = True
 		for obj in self.children:
-			obj.create_blender_object(ac_matlist, import_config)
+			if bLevelLinked:
+				str_pre_new = str_pre + "| "
+			else:
+				str_pre_new = str_pre + "  "
+
+			if self.children.index(obj) == len(self.children)-1:
+				bUseLink = False
+
+			obj.create_blender_object(ac_matlist, import_config,str_pre_new, bUseLink)
 			obj.bl_obj.parent = self.bl_obj
-			if self.type == 'world':
-				import_config.context.scene.objects.link(obj.bl_obj)
+
+		if bl_mesh:
+			bl_mesh.calc_normals()
+			bl_mesh.update(calc_edges=True)
 			
 
 '''
@@ -282,68 +307,82 @@ class AcMat:
 		self.trans = trans			# float
 
 		self.bmat_keys = {}			# dictionary list of blender materials
-		self.bmat = []				# list of valid blender materials
-		TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
+		self.bmat_keys.setdefault(None)
+		self.bl_material = None		# untextured material
+
+#		TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
+
+	def make_blender_mat(self, bl_mat, import_config):
+		bl_mat.diffuse_color = self.rgb
+		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+		bl_mat.specular_color = self.spec
+		bl_mat.specular_intensity = float(self.shi) / 100
+		bl_mat.alpha = (1.0 - self.trans)
+		if bl_mat.alpha < 1.0:
+			bl_mat.use_transparency = import_config.use_transparency
+			bl_mat.transparency_method = import_config.transparency_method
+		return bl_mat
+
 	'''
 	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
 	'''
-	def get_blender_material(self, import_config, texture=''):
+	def get_blender_material(self, import_config, tex_name=''):
 		bl_mat = None
 		tex_slot = None
-		if texture in self.bmat_keys:
-			bl_mat = self.bmat_keys[texture]
-		else:
-			bl_mat = bpy.data.materials.new(self.name)
-			bl_mat.diffuse_color = self.rgb
-			bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
-			bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
-			bl_mat.specular_color = self.spec
-			bl_mat.specular_intensity = float(self.shi) / 100
-			bl_mat.alpha = (1.0 - self.trans)
-			if bl_mat.alpha < 1.0:
-				bl_mat.use_transparency = import_config.use_transparency
-				bl_mat.transparency_method = import_config.transparency_method
-				
-			if texture != '':
-				tex_slot = bl_mat.texture_slots.add()
-				tex_slot.texture = self.get_blender_texture(import_config, texture)
+		if tex_name == '':
+			bl_mat = self.bl_material
+			if bl_mat == None:
+				bl_mat = bpy.data.materials.new(self.name)
+				bl_mat = self.make_blender_mat(bl_mat, import_config)
 
-			self.bmat_keys[texture] = self.bmat.append(bl_mat)
+				self.bl_material = bl_mat
+		else:
+			if tex_name in self.bmat_keys:
+				bl_mat = self.bmat_keys[tex_name]
+			else:
+				bl_mat = bpy.data.materials.new(self.name)
+				bl_mat = self.make_blender_mat(bl_mat, import_config)
+				
+				tex_slot = bl_mat.texture_slots.add()
+				tex_slot.texture = self.get_blender_texture(import_config, tex_name)
+
+				self.bmat_keys[tex_name] = bl_mat
 		return bl_mat
 
 	'''
 	looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
 	'''
-	def get_blender_image(self, import_config, texture):
+	def get_blender_image(self, import_config, tex_name):
 		bl_image = None
-		if texture in bpy.data.images:
+		if tex_name in bpy.data.images:
 			bl_image = bpy.data.images[texture]
 		else:
 			texture_path = None
-			if os.path.exists(texture):
+			if os.path.exists(tex_name):
 				texture_path = texture
-			elif os.path.exists(os.path.join(import_config.importdir, texture)):
-				texture_path = os.path.join(import_config.importdir, texture)
+			elif os.path.exists(os.path.join(import_config.importdir, tex_name)):
+				texture_path = os.path.join(import_config.importdir, tex_name)
 		
 			if texture_path:
-				TRACE("Loading texture: {0}".format(texture_path))
+#				TRACE("Loading texture: {0}".format(texture_path))
 				try:
 					bl_image = bpy.data.images.load(texture_path)
 				except:
-					TRACE("Failed to load texture: {0}".format(texture))
+					TRACE("Failed to load texture: {0}".format(tex_name))
 
 		return bl_image
 
 	'''
 	looks for the blender texture, adds it if it doesn't exist
 	'''
-	def get_blender_texture(self, import_config, texture):
+	def get_blender_texture(self, import_config, tex_name):
 		bl_tex = None
-		if texture in bpy.data.textures:
-			bl_tex = bpy.data.textures[texture]
+		if tex_name in bpy.data.textures:
+			bl_tex = bpy.data.textures[tex_name]
 		else:
-			bl_tex = bpy.data.textures.new(texture, 'IMAGE')
-			bl_tex.image = self.get_blender_image(import_config, texture)
+			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
+			bl_tex.image = self.get_blender_image(import_config, tex_name)
 			bl_tex.use_preview_alpha = True
 
 		return bl_tex
@@ -380,6 +419,8 @@ class ImportConf:
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
+		self.ac_name = os.path.split(filepath)[1]
+		TRACE("Importing {0}".format(self.ac_name))
 	
 class ImportAC3D:
 	def __init__(
@@ -502,6 +543,9 @@ class ImportAC3D:
 	def create_blender_data(self):
 
 		# go through the list of objects
+		bUseLink = True
 		for obj in self.oblist:
-			obj.create_blender_object(self.matlist, self.import_config)
+			if self.oblist.index(obj) == len(self.oblist)-1:
+				bUseLink = False
+			obj.create_blender_object(self.matlist, self.import_config, "", bUseLink)
 

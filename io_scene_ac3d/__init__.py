@@ -144,11 +144,11 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 
 		keywords["global_matrix"] = global_matrix
 
-		print('Importing file', self.filepath)
 		t = time.mktime(datetime.datetime.now().timetuple())
 		import_ac3d.ImportAC3D(self, context, **keywords)
 		t = time.mktime(datetime.datetime.now().timetuple()) - t
 		print('Finished importing in', t, 'seconds')
+
 		return {'FINISHED'}
 
 class ExportAC3D(bpy.types.Operator, ExportHelper):
@@ -233,7 +233,6 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 
 		keywords["global_matrix"] = global_matrix
 
-		print('Exporting file', self.filepath)
 		return export_ac3d.save(self, context, **keywords)
 
 def menu_func_import(self, context):
