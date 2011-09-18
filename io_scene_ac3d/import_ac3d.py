@@ -89,7 +89,6 @@ class AcObj:
 						}
 
 		self.read_ac_object(ac_file)
-#		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.tex_name, self.loc, self.rot, self.url))
 
 	'''
 	Read the object lines and dump them into this object, making hierarchial attachments to parents
@@ -103,7 +102,6 @@ class AcObj:
 			toks = line.strip().split()
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
-#					TRACE("\t{ln}".format(ln=line.strip()))
 					bDone = self.tokens[toks[0]](ac_file,toks)
 				else:
 					bDone = True
@@ -112,7 +110,6 @@ class AcObj:
 		vertex_count = int(toks[1])
 		for n in range(vertex_count):
 			line = ac_file.readline()
-#			TRACE("\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 			self.vert_list.append([float(x) for x in line])
 
@@ -124,7 +121,6 @@ class AcObj:
 			if line=='':
 				break
 
-#			TRACE("\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				self.surf_list.append(AcSurf(line[1],ac_file))
@@ -176,7 +172,6 @@ class AcObj:
 			line = ac_file.readline()
 			if line == '':
 				break			
-#			TRACE("\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 			self.children.append(AcObj(line[1].strip('"'),ac_file,self))
 		# This is assumed to be the last thing in the list of things to read
@@ -201,7 +196,10 @@ class AcObj:
 			self.bl_obj = bpy.data.objects.new(self.name, bl_lamp)
 
 		if self.type == 'poly':
-			bl_mesh = bpy.data.meshes.new(self.name)
+			meshname = self.name
+			if len(self.data)>0:
+				meshname = self.data
+			bl_mesh = bpy.data.meshes.new(meshname)
 			self.bl_obj = bpy.data.objects.new(self.name, bl_mesh)
 
 		if self.vert_list and bl_mesh:
@@ -214,10 +212,8 @@ class AcObj:
 				bl_material = ac_material.get_blender_material(import_config, self.tex_name)
 
 				if bl_material == None:
-					TRACE("{0}".format(len(ac_matlist)))
 					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
 
-#				TRACE("Using Material Index {0}".format(surf.mat_index))
 				fm_index = 0
 				if not bl_material.name in bl_mesh.materials:
 					bl_mesh.materials.append(bl_material)
@@ -253,7 +249,7 @@ class AcObj:
 
 					surf_material = bl_mesh.materials[self.face_mat_list[f_index]]
 					surf_image = surf_material.texture_slots[0].texture.image
-					TRACE("{0}".format(surf_image.name))
+
 					uv_tex.data[f_index].image = surf_image
 					uv_tex.data[f_index].use_image = True
 
@@ -263,7 +259,7 @@ class AcObj:
 
 		import_config.context.scene.objects.link(self.bl_obj)
 
-		TRACE("{0}+-{1}".format(str_pre, self.name))
+		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
 
 		# Add any children
 		str_pre_new = ""
@@ -299,7 +295,6 @@ class AcSurf:
 						'refs':	self.read_surf_refs,
 						}
 		self.read_ac_surfaces(ac_file)
-#		TRACE("Created surface: {0} {1} ({2})".format(self.flags, self.mat_index, len(self.refs)))
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
@@ -310,7 +305,6 @@ class AcSurf:
 			toks = line.split()
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
-#					TRACE("\t\t{ln}".format(ln=line.strip()))
 					surf_done = self.tokens[toks[0]](ac_file,toks)
 				else:
 					surf_done = True
@@ -323,7 +317,6 @@ class AcSurf:
 		num_refs = int(tokens[1])
 		for n in range(num_refs):
 			line = ac_file.readline()
-#			TRACE("\t\t\t{ln}".format(ln=line.strip()))
 			line = line.strip().split()
 		
 			self.refs.append(int(line[0]))
@@ -349,8 +342,6 @@ class AcMat:
 		self.bmat_keys.setdefault(None)
 		self.bl_material = None		# untextured material
 
-#		TRACE("Created material: {0} {1} {2} {3} {4} {5} {6}".format(self.name, self.rgb, self.amb, self.emis, self.spec, self.shi, self.trans))
-
 	def make_blender_mat(self, bl_mat, import_config):
 		bl_mat.diffuse_color = self.rgb
 		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
@@ -361,6 +352,9 @@ class AcMat:
 		if bl_mat.alpha < 1.0:
 			bl_mat.use_transparency = import_config.use_transparency
 			bl_mat.transparency_method = import_config.transparency_method
+
+		bl_mat.use_face_texture = True
+		bl_mat.use_face_texture_alpha = True
 		return bl_mat
 
 	'''
@@ -550,7 +544,6 @@ class ImportAC3D:
 			# See if this is a valid token and pass the file handle and the current line to our function
 			if len(toks) > 0:
 				if toks[0] in self.tokens.keys():
-#					TRACE("*\t{ln}".format(ln=line.strip()))
 					self.tokens[toks[0]](ac_file,toks)
 				else:
 					self.report_error("invalid token: {tok} ({ln})".format(tok=toks[0], ln=line.strip()))
