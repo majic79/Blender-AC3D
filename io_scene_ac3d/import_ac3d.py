@@ -57,7 +57,7 @@ class AcObj:
 		self.ac_parent = parent		# reference to the parent object (if the object is World, then this should be None)
 		self.name = ''				# name of the object
 		self.data = ''				# custom data
-		self.texture = ''			# texture (filepath)
+		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		self.texoff = [0,0]			# texture offset
 		self.loc = [0,0,0]			# translation location of the center relative to the parent object
@@ -66,8 +66,10 @@ class AcObj:
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
-		self.face_list = []
-		self.children = []
+		self.face_list = []			# flattened surface list
+		self.face_mat_list = []		# flattened surface material index list
+		self.children = []			
+		self.bl_mat_dict = {}		# Dictionary of ac_material index/texture pair to blender mesh material index
 
 		self.bl_obj = None			# Blender object
 
@@ -87,7 +89,7 @@ class AcObj:
 						}
 
 		self.read_ac_object(ac_file)
-#		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.texture, self.loc, self.rot, self.url))
+#		TRACE("Created object: {0} {1} {2} {3} {4} {5} {6}".format(self.type, self.name, self.data, self.tex_name, self.loc, self.rot, self.url))
 
 	'''
 	Read the object lines and dump them into this object, making hierarchial attachments to parents
@@ -149,7 +151,7 @@ class AcObj:
 		return False
 
 	def read_texture(self, ac_file, toks):
-		self.texture=toks[1].strip('"')
+		self.tex_name=toks[1].strip('"')
 		return False
 
 	def read_texrep(self, ac_file, toks):
@@ -204,22 +206,59 @@ class AcObj:
 
 		if self.vert_list and bl_mesh:
 			# make sure we have some vertices
-			face_list = []
-			bl_mat_dict = {}
+			
 			for surf in self.surf_list:
-				face_list.append(surf.refs)
+				self.face_list.append(surf.refs)
 				# Material index is 1 based, the list we built is 0 based
-				ac_material = ac_matlist[surf.mat_index-1]
-				bl_material = ac_material.get_blender_material(import_config, self.texture)
+				ac_material = ac_matlist[surf.mat_index]
+				bl_material = ac_material.get_blender_material(import_config, self.tex_name)
+
 				if bl_material == None:
 					TRACE("{0}".format(len(ac_matlist)))
-					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.texture))
+					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
 
 #				TRACE("Using Material Index {0}".format(surf.mat_index))
-#				if not bl_material.name in bl_mesh.materials:
-#					bl_mesh.materials.append(bl_material)
-			
-			bl_mesh.from_pydata(self.vert_list, [], face_list)
+				fm_index = 0
+				if not bl_material.name in bl_mesh.materials:
+					bl_mesh.materials.append(bl_material)
+					fm_index = len(bl_mesh.materials)-1
+				else:
+					for mat in bl_mesh.materials:
+						if mat == bl_material:
+							continue
+						fm_index += 1
+					if fm_index > len(bl_mesh.materials):
+						TRACE("Failed to find material index")
+						fm_index = 0
+				self.face_mat_list.append(fm_index)
+				
+			bl_mesh.from_pydata(self.vert_list, [], self.face_list)
+
+			face_mat = [m for m in self.face_mat_list]
+			bl_mesh.faces.foreach_set("material_index", face_mat)
+			del face_mat
+
+			if self.tex_name != '':
+				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
+
+				for f_index in range(len(self.surf_list)):
+					surf = self.surf_list[f_index]
+
+					uv_tex.data[f_index].uv1=surf.uv_refs[0]
+					uv_tex.data[f_index].uv2=surf.uv_refs[1]
+					uv_tex.data[f_index].uv3=surf.uv_refs[2]
+
+					if len(surf.uv_refs) > 3:
+						uv_tex.data[f_index].uv4=surf.uv_refs[3]
+
+					surf_material = bl_mesh.materials[self.face_mat_list[f_index]]
+					surf_image = surf_material.texture_slots[0].texture.image
+					TRACE("{0}".format(surf_image.name))
+					uv_tex.data[f_index].image = surf_image
+					uv_tex.data[f_index].use_image = True
+
+				uv_tex.active = True
+		
 			self.bl_obj.show_transparent = import_config.display_transparency
 
 		import_config.context.scene.objects.link(self.bl_obj)
@@ -346,7 +385,11 @@ class AcMat:
 				
 				tex_slot = bl_mat.texture_slots.add()
 				tex_slot.texture = self.get_blender_texture(import_config, tex_name)
-
+				tex_slot.texture_coords = 'UV'
+				tex_slot.alpha_factor = 1.0
+				tex_slot.use_map_alpha = True
+				tex_slot.use = True
+				tex_slot.uv_layer = tex_name
 				self.bmat_keys[tex_name] = bl_mat
 		return bl_mat
 
@@ -384,7 +427,7 @@ class AcMat:
 			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
 			bl_tex.image = self.get_blender_image(import_config, tex_name)
 			bl_tex.use_preview_alpha = True
-
+			
 		return bl_tex
 
 class ImportConf:
