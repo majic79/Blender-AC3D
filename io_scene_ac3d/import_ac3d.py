@@ -162,8 +162,8 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		self.texoff = [0,0]			# texture offset
-		self.loc = [0,0,0]			# translation location of the center relative to the parent object
-		self.rot = [[1,0,0],[0,1,0],[0,0,1]]	# 3x3 rotational matrix for vertices
+		self.location = [0,0,0]			# translation location of the center relative to the parent object
+		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))	# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
@@ -238,15 +238,11 @@ class AcObj:
 		return False
 
 	def read_location(self, ac_file, toks):
-		self.loc=[0,0,0]
+		self.location=[float(x) for x in toks[1:4]]
 		return False
 
 	def read_rotation(self, ac_file, toks):
-		self.rot = Matrix([
-							[float(x) for x in toks[1:4]],
-							[float(x) for x in toks[4:7]],
-							[float(x) for x in toks[7:9]],
-							])	# 3x3 rotational matrix for vertices
+		self.rotation = Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:9]]))
 		return False
 
 	def read_texture(self, ac_file, toks):
@@ -360,6 +356,9 @@ class AcObj:
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
+			self.bl_obj.rotation_euler = self.rotation.to_euler()
+
+			self.bl_obj.location = self.location
 			self.import_config.context.scene.objects.link(self.bl_obj)
 
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
@@ -378,6 +377,9 @@ class AcObj:
 
 			obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
 			obj.bl_obj.parent = self.bl_obj
+			if self.type == 'world':
+				obj.bl_obj.rotation_euler = self.import_config.global_matrix.to_euler()
+
 
 		if bl_mesh:
 			bl_mesh.calc_normals()

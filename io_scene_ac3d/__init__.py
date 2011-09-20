@@ -77,7 +77,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 								('-Y', "-Y Forward", ""),
 								('-Z', "-Z Forward", ""),
 							),
-							default='Y',
+							default='-Z',
 						)
 
 	axis_up = EnumProperty(
@@ -89,7 +89,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 								('-Y', "-Y Up", ""),
 								('-Z', "-Z Up", ""),
 							),
-							default='Z',
+							default='Y',
 						)
 
 	use_auto_smooth = BoolProperty(
