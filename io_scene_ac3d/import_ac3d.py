@@ -23,7 +23,6 @@ import struct
 import bpy
 import mathutils
 from math import radians
-from collections import defaultdict
 from bpy import *
 from bpy_extras.image_utils import load_image
 
