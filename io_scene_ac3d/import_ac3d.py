@@ -48,11 +48,113 @@ def TRACE(message):
 	if DEBUG:
 		print(message)
 
-'''
-Container class for a .ac OBJECT
-'''
+class AcMat:
+	'''
+	Container class that defines the material properties of the .ac MATERIAL
+	'''
+	def __init__(self, name, rgb, amb, emis, spec, shi, trans, import_config):
+		if name == "":
+			name = "Default"
+		self.name = name			# string
+		self.rgb = rgb				# [R,G,B]
+		self.amb = amb				# [R,G,B]
+		self.emis = emis			# [R,G,B]
+		self.spec = spec			# [R,G,B]
+		self.shi = shi				# integer
+		self.trans = trans			# float
+
+		self.bmat_keys = {}			# dictionary list of blender materials
+		self.bmat_keys.setdefault(None)
+		self.bl_material = None		# untextured material
+		self.import_config = import_config
+
+	def make_blender_mat(self, bl_mat):
+		bl_mat.diffuse_color = self.rgb
+		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+		bl_mat.specular_color = self.spec
+		bl_mat.specular_intensity = float(self.shi) / 100
+		bl_mat.alpha = (1.0 - self.trans)
+		if bl_mat.alpha < 1.0:
+			bl_mat.use_transparency = self.import_config.use_transparency
+			bl_mat.transparency_method = self.import_config.transparency_method
+
+		bl_mat.use_face_texture = True
+		bl_mat.use_face_texture_alpha = True
+		return bl_mat
+
+	'''
+	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
+	'''
+	def get_blender_material(self, tex_name=''):
+		bl_mat = None
+		tex_slot = None
+		if tex_name == '':
+			bl_mat = self.bl_material
+			if bl_mat == None:
+				bl_mat = bpy.data.materials.new(self.name)
+				bl_mat = self.make_blender_mat(bl_mat)
+
+				self.bl_material = bl_mat
+		else:
+			if tex_name in self.bmat_keys:
+				bl_mat = self.bmat_keys[tex_name]
+			else:
+				bl_mat = bpy.data.materials.new(self.name)
+				bl_mat = self.make_blender_mat(bl_mat)
+				
+				tex_slot = bl_mat.texture_slots.add()
+				tex_slot.texture = self.get_blender_texture(tex_name)
+				tex_slot.texture_coords = 'UV'
+				tex_slot.alpha_factor = 1.0
+				tex_slot.use_map_alpha = True
+				tex_slot.use = True
+				tex_slot.uv_layer = tex_name
+				self.bmat_keys[tex_name] = bl_mat
+		return bl_mat
+
+	'''
+	looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
+	'''
+	def get_blender_image(self, tex_name):
+		bl_image = None
+		if tex_name in bpy.data.images:
+			bl_image = bpy.data.images[texture]
+		else:
+			texture_path = None
+			if os.path.exists(tex_name):
+				texture_path = texture
+			elif os.path.exists(os.path.join(self.import_config.importdir, tex_name)):
+				texture_path = os.path.join(self.import_config.importdir, tex_name)
+		
+			if texture_path:
+#				TRACE("Loading texture: {0}".format(texture_path))
+				try:
+					bl_image = bpy.data.images.load(texture_path)
+				except:
+					TRACE("Failed to load texture: {0}".format(tex_name))
+
+		return bl_image
+
+	'''
+	looks for the blender texture, adds it if it doesn't exist
+	'''
+	def get_blender_texture(self, tex_name):
+		bl_tex = None
+		if tex_name in bpy.data.textures:
+			bl_tex = bpy.data.textures[tex_name]
+		else:
+			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
+			bl_tex.image = self.get_blender_image(tex_name)
+			bl_tex.use_preview_alpha = True
+			
+		return bl_tex
+
 class AcObj:
-	def __init__(self, ob_type, ac_file, parent = None):
+	'''
+	Container class for a .ac OBJECT
+	'''
+	def __init__(self, ob_type, ac_file, import_config, parent = None):
 		self.type = ob_type			# Type of object
 		self.ac_parent = parent		# reference to the parent object (if the object is World, then this should be None)
 		self.name = ''				# name of the object
@@ -72,6 +174,7 @@ class AcObj:
 		self.bl_mat_dict = {}		# Dictionary of ac_material index/texture pair to blender mesh material index
 
 		self.bl_obj = None			# Blender object
+		self.import_config = import_config
 
 		self.tokens =	{
 						'numvert':	self.read_vertices,
@@ -123,7 +226,7 @@ class AcObj:
 
 			line = line.strip().split()
 			if line[0] == 'SURF':
-				self.surf_list.append(AcSurf(line[1],ac_file))
+				self.surf_list.append(AcSurf(line[1], ac_file, self.import_config))
 
 	def read_name(self, ac_file, toks):
 		self.name=toks[1].strip('"')
@@ -173,7 +276,7 @@ class AcObj:
 			if line == '':
 				break			
 			line = line.strip().split()
-			self.children.append(AcObj(line[1].strip('"'),ac_file,self))
+			self.children.append(AcObj(line[1].strip('"'), ac_file, self.import_config, self))
 		# This is assumed to be the last thing in the list of things to read
 		# returning True indicates to cease parsing this object
 		return True
@@ -181,15 +284,14 @@ class AcObj:
 	'''
 	This function does the work of creating an object in blender and configuring it correctly
 	'''
-	def create_blender_object(self, ac_matlist, import_config, str_pre, bLevelLinked):
+	def create_blender_object(self, ac_matlist, str_pre, bLevelLinked):
 
 		if self.type == 'world':
-			self.name = import_config.ac_name
+			self.name = self.import_config.ac_name
 		bl_mesh = None
-		if self.type == 'group' or self.type == 'world':
+		if self.type == 'group':
 			# Create an empty object
 			self.bl_obj = bpy.data.objects.new(self.name, None)
-#			import_config.context.scene.objects.link(self.bl_obj)
 
 		if self.type == 'light':
 			bl_lamp = bpy.data.lamps.new(self.name)
@@ -209,7 +311,7 @@ class AcObj:
 				self.face_list.append(surf.refs)
 				# Material index is 1 based, the list we built is 0 based
 				ac_material = ac_matlist[surf.mat_index]
-				bl_material = ac_material.get_blender_material(import_config, self.tex_name)
+				bl_material = ac_material.get_blender_material(self.tex_name)
 
 				if bl_material == None:
 					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
@@ -255,9 +357,10 @@ class AcObj:
 
 				uv_tex.active = True
 		
-			self.bl_obj.show_transparent = import_config.display_transparency
+			self.bl_obj.show_transparent = self.import_config.display_transparency
 
-		import_config.context.scene.objects.link(self.bl_obj)
+		if self.bl_obj:
+			self.import_config.context.scene.objects.link(self.bl_obj)
 
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
 
@@ -273,19 +376,18 @@ class AcObj:
 			if self.children.index(obj) == len(self.children)-1:
 				bUseLink = False
 
-			obj.create_blender_object(ac_matlist, import_config,str_pre_new, bUseLink)
+			obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
 			obj.bl_obj.parent = self.bl_obj
 
 		if bl_mesh:
 			bl_mesh.calc_normals()
 			bl_mesh.update(calc_edges=True)
 			
-
-'''
-Container class for surface definition within a parent object
-'''
 class AcSurf:
-	def __init__(self, flags, ac_file):
+	'''
+	Container class for surface definition within a parent object
+	'''
+	def __init__(self, flags, ac_file, import_config):
 		self.flags = flags			# surface flags
 		self.mat_index = 0				# default material
 		self.refs = []				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
@@ -295,6 +397,7 @@ class AcSurf:
 						'refs':	self.read_surf_refs,
 						}
 		self.read_ac_surfaces(ac_file)
+		self.import_config = import_config
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
@@ -323,106 +426,6 @@ class AcSurf:
 			self.uv_refs.append([float(x) for x in line[1:3]])
 		return True
 
-class AcMat:
-	'''
-	Container class that defines the material properties of the .ac MATERIAL
-	'''
-	def __init__(self, name, rgb, amb, emis, spec, shi, trans):
-		if name == "":
-			name = "Default"
-		self.name = name			# string
-		self.rgb = rgb				# [R,G,B]
-		self.amb = amb				# [R,G,B]
-		self.emis = emis			# [R,G,B]
-		self.spec = spec			# [R,G,B]
-		self.shi = shi				# integer
-		self.trans = trans			# float
-
-		self.bmat_keys = {}			# dictionary list of blender materials
-		self.bmat_keys.setdefault(None)
-		self.bl_material = None		# untextured material
-
-	def make_blender_mat(self, bl_mat, import_config):
-		bl_mat.diffuse_color = self.rgb
-		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
-		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
-		bl_mat.specular_color = self.spec
-		bl_mat.specular_intensity = float(self.shi) / 100
-		bl_mat.alpha = (1.0 - self.trans)
-		if bl_mat.alpha < 1.0:
-			bl_mat.use_transparency = import_config.use_transparency
-			bl_mat.transparency_method = import_config.transparency_method
-
-		bl_mat.use_face_texture = True
-		bl_mat.use_face_texture_alpha = True
-		return bl_mat
-
-	'''
-	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
-	'''
-	def get_blender_material(self, import_config, tex_name=''):
-		bl_mat = None
-		tex_slot = None
-		if tex_name == '':
-			bl_mat = self.bl_material
-			if bl_mat == None:
-				bl_mat = bpy.data.materials.new(self.name)
-				bl_mat = self.make_blender_mat(bl_mat, import_config)
-
-				self.bl_material = bl_mat
-		else:
-			if tex_name in self.bmat_keys:
-				bl_mat = self.bmat_keys[tex_name]
-			else:
-				bl_mat = bpy.data.materials.new(self.name)
-				bl_mat = self.make_blender_mat(bl_mat, import_config)
-				
-				tex_slot = bl_mat.texture_slots.add()
-				tex_slot.texture = self.get_blender_texture(import_config, tex_name)
-				tex_slot.texture_coords = 'UV'
-				tex_slot.alpha_factor = 1.0
-				tex_slot.use_map_alpha = True
-				tex_slot.use = True
-				tex_slot.uv_layer = tex_name
-				self.bmat_keys[tex_name] = bl_mat
-		return bl_mat
-
-	'''
-	looks for the image in blender, adds it if it doesn't exist, returns the image to the callee
-	'''
-	def get_blender_image(self, import_config, tex_name):
-		bl_image = None
-		if tex_name in bpy.data.images:
-			bl_image = bpy.data.images[texture]
-		else:
-			texture_path = None
-			if os.path.exists(tex_name):
-				texture_path = texture
-			elif os.path.exists(os.path.join(import_config.importdir, tex_name)):
-				texture_path = os.path.join(import_config.importdir, tex_name)
-		
-			if texture_path:
-#				TRACE("Loading texture: {0}".format(texture_path))
-				try:
-					bl_image = bpy.data.images.load(texture_path)
-				except:
-					TRACE("Failed to load texture: {0}".format(tex_name))
-
-		return bl_image
-
-	'''
-	looks for the blender texture, adds it if it doesn't exist
-	'''
-	def get_blender_texture(self, import_config, tex_name):
-		bl_tex = None
-		if tex_name in bpy.data.textures:
-			bl_tex = bpy.data.textures[tex_name]
-		else:
-			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
-			bl_tex.image = self.get_blender_image(import_config, tex_name)
-			bl_tex.use_preview_alpha = True
-			
-		return bl_tex
 
 class ImportConf:
 	def __init__(
@@ -507,7 +510,6 @@ class ImportAC3D:
 		ac_file = open(filepath, 'r')
 		self.header = ac_file.readline().strip()
 		if len(self.header) != 5:
-			# have blender report an error (using an indexed argument)
 			operator.report('ERROR',"Invalid file header length: {0}".format(self.header))
 			ac_file.close()
 			return None
@@ -563,7 +565,8 @@ class ImportAC3D:
 						[float(x) for x in line[11:14]],
 						[float(x) for x in line[15:18]],
 						int(line[19]),
-						float(line[21])
+						float(line[21]),
+						self.import_config,
 						))
 
 	'''
@@ -571,7 +574,7 @@ class ImportAC3D:
 	'''
 	def read_object(self, ac_file, line):
 		# OBJECT %s
-		self.oblist.append(AcObj(line[1].strip('"'), ac_file))
+		self.oblist.append(AcObj(line[1].strip('"'), ac_file, self.import_config))
 
 	'''
 	Reads the data imported from the file and creates blender data
@@ -583,5 +586,5 @@ class ImportAC3D:
 		for obj in self.oblist:
 			if self.oblist.index(obj) == len(self.oblist)-1:
 				bUseLink = False
-			obj.create_blender_object(self.matlist, self.import_config, "", bUseLink)
+			obj.create_blender_object(self.matlist, "", bUseLink)
 
