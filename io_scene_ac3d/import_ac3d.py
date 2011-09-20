@@ -78,9 +78,7 @@ class AcMat:
 		if bl_mat.alpha < 1.0:
 			bl_mat.use_transparency = self.import_config.use_transparency
 			bl_mat.transparency_method = self.import_config.transparency_method
-
-		bl_mat.use_face_texture = True
-		bl_mat.use_face_texture_alpha = True
+		
 		return bl_mat
 
 	'''
@@ -102,6 +100,8 @@ class AcMat:
 			else:
 				bl_mat = bpy.data.materials.new(self.name)
 				bl_mat = self.make_blender_mat(bl_mat)
+				bl_mat.use_face_texture = True
+				bl_mat.use_face_texture_alpha = True
 				
 				tex_slot = bl_mat.texture_slots.add()
 				tex_slot.texture = self.get_blender_texture(tex_name)
@@ -328,6 +328,9 @@ class AcObj:
 				
 			bl_mesh.from_pydata(self.vert_list, [], self.face_list)
 
+			bl_mesh.use_auto_smooth = self.import_config.use_auto_smooth
+			bl_mesh.auto_smooth_angle = radians(self.crease)
+
 			face_mat = [m for m in self.face_mat_list]
 			bl_mesh.faces.foreach_set("material_index", face_mat)
 			del face_mat
@@ -337,6 +340,8 @@ class AcObj:
 
 				for f_index in range(len(self.surf_list)):
 					surf = self.surf_list[f_index]
+
+					bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
 
 					uv_tex.data[f_index].uv1=surf.uv_refs[0]
 					uv_tex.data[f_index].uv2=surf.uv_refs[1]
@@ -386,11 +391,25 @@ class AcObj:
 			bl_mesh.update(calc_edges=True)
 			
 class AcSurf:
+	class AcSurfFlags:
+		def __init__(self, flags):
+			self.type = 0		# Surface Type: 0=Polygon, 1=closedLine, 2=Line
+			self.shaded = False
+			self.two_sided = False
+			i = int(flags,16)
+
+			self.type = i & 0xF
+			i = i >> 4
+			if i&1:
+				self.shaded = True
+			if i&2:
+				self.two_sided = True
+
 	'''
 	Container class for surface definition within a parent object
 	'''
 	def __init__(self, flags, ac_file, import_config):
-		self.flags = flags			# surface flags
+		self.flags = self.AcSurfFlags(flags)			# surface flags
 		self.mat_index = 0				# default material
 		self.refs = []				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
 		self.uv_refs = []
@@ -435,29 +454,24 @@ class ImportConf:
 			operator,
 			context,
 			filepath,
-			use_image_search,
 			global_matrix,
-			use_auto_smooth,
-			show_double_sided,
 			use_transparency,
 			transparency_method,
-			transparency_shadows,
 			display_transparency,
+			use_auto_smooth,
 			use_emis_as_mircol,
-			use_subsurf,
+			use_amb_as_mircol,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
 		self.context = context
 		self.global_matrix = global_matrix
-		self.use_image_search = use_image_search
-		self.use_auto_smooth = use_auto_smooth
-		self.show_double_sided = show_double_sided
 		self.use_transparency = use_transparency
 		self.transparency_method = transparency_method
-		self.transparency_shadows = transparency_shadows
 		self.display_transparency = display_transparency
+		self.use_auto_smooth = use_auto_smooth
 		self.use_emis_as_mircol = use_emis_as_mircol
+		self.use_amb_as_mircol = use_amb_as_mircol
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
@@ -472,30 +486,25 @@ class ImportAC3D:
 			filepath="",
 			use_image_search=False,
 			global_matrix=None,
-			use_auto_smooth=False,	
-			show_double_sided=True,
 			use_transparency=True,
 			transparency_method='Z_TRANSPARENCY',
-			transparency_shadows=False,
 			display_transparency=True,
+			use_auto_smooth=True,
 			use_emis_as_mircol=True,
-			use_subsurf=True,
+			use_amb_as_mircol=False,
 			):
 
 		self.import_config = ImportConf(
 										operator,
 										context,
 										filepath,
-										use_image_search,
 										global_matrix,
-										use_auto_smooth,
-										show_double_sided,
 										use_transparency,
 										transparency_method,
-										transparency_shadows,
 										display_transparency,
+										use_auto_smooth,
 										use_emis_as_mircol,
-										use_subsurf,
+										use_amb_as_mircol,
 										)
 
 

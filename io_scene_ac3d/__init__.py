@@ -63,11 +63,6 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 	filename_ext = '.ac'
 	filter_glob = StringProperty(default='*.ac', options={'HIDDEN'})
 
-	use_image_search = BoolProperty(
-							name='Image Search',
-							description='Search subdirectories for any associated images',
-							default=True)
-
 	axis_forward = EnumProperty(
 							name="Forward",
 							items=(('X', "X Forward", ""),
@@ -92,12 +87,6 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							default='Y',
 						)
 
-	use_auto_smooth = BoolProperty(
-							name="Auto Smooth",
-							description="treats all set-smoothed faces with angles less than the specified angle as 'smooth' during render",
-							default=False
-						)
-	#auto smooth angle will be defined by "crease" property
 	use_transparency = BoolProperty(
 							name="Use Transparency",
 							description="Enable transparency for rendering if material alpha < 1.0",
@@ -113,15 +102,14 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							default='Z_TRANSPARENCY',
 						)
 
-	transparency_shadows = BoolProperty(
-							name="Transparency Shadows",
-							description="Allow shadows to pass through transparency",
-							default=True,
-						)
-
 	display_transparency = BoolProperty(
 							name="Display Transparency",
 							description="Display transparency in materials with alpha < 1.0",
+							default=True,
+						)
+	use_auto_smooth = BoolProperty(
+							name="Auto Smooth",
+							description="Use object auto smooth if normal angles are beneath Crease angle",
 							default=True,
 						)
 	use_emis_as_mircol = BoolProperty(
@@ -130,6 +118,11 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							default=True,
 						)
 
+	use_amb_as_mircol = BoolProperty(
+							name="Use Amb as Mirror colour",
+							description="Use Ambient colour as Mirror colour",
+							default=False,
+						)
 
 	def execute(self, context):
 		from . import import_ac3d
@@ -173,7 +166,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 									('-Y', "-Y Forward", ""),
 									('-Z', "-Z Forward", ""),
 									),
-								default='Y',
+								default='-Z',
 								)
 
 	axis_up = EnumProperty(
@@ -185,7 +178,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 								('-Y', "-Y Up", ""),
 								('-Z', "-Z Up", ""),
 								),
-							default='Z',
+							default='Y',
 							)
 
 	use_selection = BoolProperty(
