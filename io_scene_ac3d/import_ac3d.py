@@ -168,6 +168,7 @@ class AcObj:
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
+		self.edge_list = []			# spare edge list (handles poly lines etc)
 		self.face_mat_list = []		# flattened surface material index list
 		self.children = []			
 		self.bl_mat_dict = {}		# Dictionary of ac_material index/texture pair to blender mesh material index
@@ -303,7 +304,12 @@ class AcObj:
 			# make sure we have some vertices
 			
 			for surf in self.surf_list:
-				self.face_list.append(surf.refs)
+				if len(surf.refs) > 4 or len(surf.refs) < 3:
+					TRACE("Error with polygon ref count! ({0})".format(len(surf.refs)))
+					continue
+				self.face_list.append(surf.get_faces())
+				self.edge_list.append(surf.get_edges())
+
 				# Material index is 1 based, the list we built is 0 based
 				ac_material = ac_matlist[surf.mat_index]
 				bl_material = ac_material.get_blender_material(self.tex_name)
@@ -325,7 +331,7 @@ class AcObj:
 						fm_index = 0
 				self.face_mat_list.append(fm_index)
 				
-			bl_mesh.from_pydata(self.vert_list, [], self.face_list)
+			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
 			bl_mesh.use_auto_smooth = self.import_config.use_auto_smooth
 			bl_mesh.auto_smooth_angle = radians(self.crease)
@@ -338,6 +344,10 @@ class AcObj:
 				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
 
 				for f_index in range(len(self.surf_list)):
+					if len(self.surf_list[f_index].refs)> 4 or len(self.surf_list[f_index].refs) < 3:
+						# skip it (error will be noted above)
+						continue
+
 					surf = self.surf_list[f_index]
 
 					bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
@@ -416,8 +426,9 @@ class AcSurf:
 						'mat':	self.read_surf_material,
 						'refs':	self.read_surf_refs,
 						}
-		self.read_ac_surfaces(ac_file)
+
 		self.import_config = import_config
+		self.read_ac_surfaces(ac_file)
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
@@ -445,7 +456,24 @@ class AcSurf:
 			self.refs.append(int(line[0]))
 			self.uv_refs.append([float(x) for x in line[1:3]])
 		return True
+	def get_faces(self):
+		# convert refs and surface type to faces
+		surf_faces = []
+		if self.flags.type == 0:
+			surf_faces = self.refs
+		return surf_faces
 
+	def get_edges(self):
+		# convert refs and surface type to edges
+		surf_edges = []
+		if self.flags.type != 0:
+			for x in range(len(self.refs)-1):
+				surf_edge.append([self.refs[x],self.refs[x+1]])
+
+			if self.flags.type == 1:
+				# closed line
+				surf_edge.append([self.refs[len(refs)-1],self.refs[0]])
+		return surf_edges
 
 class ImportConf:
 	def __init__(
@@ -456,10 +484,11 @@ class ImportConf:
 			global_matrix,
 			use_transparency,
 			transparency_method,
-			display_transparency,
 			use_auto_smooth,
 			use_emis_as_mircol,
 			use_amb_as_mircol,
+			display_transparency,
+			display_textured_solid,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
@@ -467,10 +496,11 @@ class ImportConf:
 		self.global_matrix = global_matrix
 		self.use_transparency = use_transparency
 		self.transparency_method = transparency_method
-		self.display_transparency = display_transparency
 		self.use_auto_smooth = use_auto_smooth
 		self.use_emis_as_mircol = use_emis_as_mircol
 		self.use_amb_as_mircol = use_amb_as_mircol
+		self.display_transparency = display_transparency
+		self.display_textured_solid = display_textured_solid
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
@@ -487,10 +517,11 @@ class ImportAC3D:
 			global_matrix=None,
 			use_transparency=True,
 			transparency_method='Z_TRANSPARENCY',
-			display_transparency=True,
 			use_auto_smooth=True,
 			use_emis_as_mircol=True,
 			use_amb_as_mircol=False,
+			display_transparency=True,
+			display_textured_solid=False,
 			):
 
 		self.import_config = ImportConf(
@@ -500,10 +531,11 @@ class ImportAC3D:
 										global_matrix,
 										use_transparency,
 										transparency_method,
-										display_transparency,
 										use_auto_smooth,
 										use_emis_as_mircol,
 										use_amb_as_mircol,
+										display_transparency,
+										display_textured_solid,
 										)
 
 
@@ -537,6 +569,14 @@ class ImportAC3D:
 		ac_file.close()
 
 		self.create_blender_data()
+
+		# Display as either textured solid (transparency only works in one direction) or as textureless solids (transparency works)
+		for bl_screen in bpy.data.screens:
+			for bl_area in bl_screen.areas:
+				for bl_space in bl_area.spaces:
+					if bl_space.type == 'VIEW_3D':
+						bl_space.show_textured_solid = self.import_config.display_textured_solid
+
 
 		return None
 

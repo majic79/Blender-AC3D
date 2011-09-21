@@ -102,11 +102,6 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							default='Z_TRANSPARENCY',
 						)
 
-	display_transparency = BoolProperty(
-							name="Display Transparency",
-							description="Display transparency in materials with alpha < 1.0",
-							default=True,
-						)
 	use_auto_smooth = BoolProperty(
 							name="Auto Smooth",
 							description="Use object auto smooth if normal angles are beneath Crease angle",
@@ -121,6 +116,16 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 	use_amb_as_mircol = BoolProperty(
 							name="Use Amb as Mirror colour",
 							description="Use Ambient colour as Mirror colour",
+							default=False,
+						)
+	display_transparency = BoolProperty(
+							name="Display Transparency",
+							description="Display transparency in main display",
+							default=True,
+						)
+	display_textured_solid = BoolProperty(
+							name="Display textured solid",
+							description="Show main window with textures applied (transparency works in only in normal direction)",
 							default=False,
 						)
 
