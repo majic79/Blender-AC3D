@@ -73,7 +73,7 @@ class AcMat:
 		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
 		bl_mat.specular_color = self.spec
 		bl_mat.specular_intensity = float(self.shi) / 100
-		bl_mat.alpha = (1.0 - self.trans)
+		bl_mat.alpha = 1.0 - self.trans
 		if bl_mat.alpha < 1.0:
 			bl_mat.use_transparency = self.import_config.use_transparency
 			bl_mat.transparency_method = self.import_config.transparency_method

@@ -19,13 +19,21 @@
 # <pep8 compliant>
 
 # Most of this has been copied from the __init__.py file for the io_scene__xx
-# folders of the standard 2.5.9 blender package and customised to
+# folders of the standard 2.59 blender package and customised to
 # act as a wrapper for the conventional AC3D importer/exporter
+
+import time
+import datetime
+import bpy
+import mathutils
+from math import radians
+from bpy.props import StringProperty, BoolProperty, FloatProperty, EnumProperty
+from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
 
 bl_info = {
 	"name": "AC3D (.ac) format",
-	"description": "AC3D model importer for blender.",
-	"author": "Chris Marr, Rene Negre",
+	"description": "AC3D model exporter for blender.",
+	"author": "Chris Marr",
 	"version": (2,0),
 	"blender" : (2,5,9),
 	"api": 36079,
@@ -45,14 +53,26 @@ if "bpy" in locals():
 	if 'export_ac3d' in locals():
 		imp.reload(export_ac3d)
 
-import time
-import datetime
-import bpy
-import mathutils
-from math import radians
-from bpy.props import StringProperty, BoolProperty, FloatProperty, EnumProperty
-from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
+def menu_func_import(self, context):
+	self.layout.operator(ImportAC3D.bl_idname, text='AC3D (.ac)')
 
+
+def menu_func_export(self, context):
+	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
+
+
+def register():
+	bpy.utils.register_module(__name__)
+	bpy.types.INFO_MT_file_import.append(menu_func_import)
+	bpy.types.INFO_MT_file_export.append(menu_func_export)
+
+def unregister():
+	bpy.utils.unregister_module(__name__)
+	bpy.types.INFO_MT_file_import.remove(menu_func_import)
+	bpy.types.INFO_MT_file_export.remove(menu_func_export)
+
+if __name__ == "__main__":
+	register()
 
 class ImportAC3D(bpy.types.Operator, ImportHelper):
 	'''Import from AC3D file format (.ac)'''
@@ -202,14 +222,14 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="Transform all vertices of all meshes to global coordinates",
 							default=False,
 							)
-	mircol_as_amb = BoolProperty(
-							name="Mirror col as Amb",
-							description="export mirror colour as ambient colour",
-							default=False,
-							)
 	mircol_as_emis = BoolProperty(
 							name="Mirror col as Emis",
 							description="export mirror colour as emissive colour",
+							default=True,
+							)
+	mircol_as_amb = BoolProperty(
+							name="Mirror col as Amb",
+							description="export mirror colour as ambient colour",
 							default=False,
 							)
 	no_split = BoolProperty(
@@ -223,6 +243,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 		keywords = self.as_keywords(ignore=("axis_forward",
 											"axis_up",
 											"filter_glob",
+											"check_existing",
 											))
 
 		global_matrix = axis_conversion(to_forward=self.axis_forward,
@@ -230,26 +251,10 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 										).to_4x4()
 
 		keywords["global_matrix"] = global_matrix
+		t = time.mktime(datetime.datetime.now().timetuple())
+		export_ac3d.ExportAC3D(self, context, **keywords)
+		t = time.mktime(datetime.datetime.now().timetuple()) - t
+		print('Finished exporting in', t, 'seconds')
 
-		return export_ac3d.save(self, context, **keywords)
+		return {'FINISHED'}
 
-def menu_func_import(self, context):
-	self.layout.operator(ImportAC3D.bl_idname, text='AC3D (.ac)')
-
-
-def menu_func_export(self, context):
-	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
-
-
-def register():
-	bpy.utils.register_module(__name__)
-	bpy.types.INFO_MT_file_import.append(menu_func_import)
-	bpy.types.INFO_MT_file_export.append(menu_func_export)
-
-def unregister():
-	bpy.utils.unregister_module(__name__)
-	bpy.types.INFO_MT_file_import.remove(menu_func_import)
-	bpy.types.INFO_MT_file_export.remove(menu_func_export)
-
-if __name__ == "__main__":
-	register()
