@@ -366,7 +366,7 @@ class AcObj:
 					uv_tex.data[f_index].use_image = True
 
 				uv_tex.active = True
-		
+				
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:

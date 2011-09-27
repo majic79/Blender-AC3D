@@ -36,12 +36,12 @@ class AcMat:
 	Container class that defines the material properties of the .ac MATERIAL
 	'''
 	def __init__(self, export_config):
-		self.name = "DefaultWhite"	# string
-		self.rgb = [1,1,1]			# [R,G,B]
-		self.amb = [0,0,0]			# [R,G,B]
-		self.emis = [0,0,0]			# [R,G,B]
-		self.spec = [0,0,0]			# [R,G,B]
-		self.shi = 0				# integer
+		self.name = 'DefaultWhite'	# string
+		self.rgb = [1.0, 1.0, 1.0]			# [R,G,B]
+		self.amb = [0.2, 0.2, 0.2]			# [R,G,B]
+		self.emis = [0.0, 0.0, 0.0]			# [R,G,B]
+		self.spec = [0.5, 0.5, 0.5]			# [R,G,B]
+		self.shi = 10				# integer
 		self.trans = 0				# float
 
 		self.export_config = export_config
@@ -61,7 +61,7 @@ class AcMat:
 	def write_ac_material(self, ac_file):
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
 
-		ac_file.write('MATERIAL "{0}" rgb {1} {2} {3}  amb {4} {5} {6}  emis {7} {8} {9}  spec {10} {11} {12}  shi {13} trans {14}\n'.format(
+		ac_file.write('MATERIAL "{0}" rgb {1:.4f} {2:.4f} {3:.4f}  amb {4:.4f} {5:.4f} {6:.4f}  emis {7:.4f} {8:.4f} {9:.4f}  spec {10:.4f} {11:.4f} {12:.4f}  shi {13} trans {14:.4f}\n'.format(
 							self.name,
 							self.rgb[0], self.rgb[1], self.rgb[2],
 							self.amb[0], self.amb[1], self.amb[2],
@@ -96,17 +96,205 @@ class AcMat:
 		'''
 		pass
 
+class AcSurf:
+	class AcSurfFlags:
+		def __init__(
+				self,
+				surf_type,
+				is_shaded,
+				is_twosided,
+				):
+			self.surf_type = surf_type
+			self.is_shaded = is_shaded
+			self.is_twosided = is_twosided
+
+		def get_flags(self):
+			n = self.surf_type & 0x0f
+			if self.is_shaded:
+				n = n | 0x10
+			if self.is_twosided:
+				n = n | 0x20
+			return n
+
+	def __init__(
+			self,
+			export_config,
+			bl_face,
+			ac_obj,
+			):
+		self.export_config = export_config
+		self.mat = 0		# material index for this surface
+		self.refs = []		# list of vertex references from the parent mesh
+		self.uv_refs = []	# list of tuples with the UV co-ordinates of this vertex
+
+		self.ac_surf_flags = self.AcSurfFlags(0, True, False)
+
+		self.parse_blender_face(bl_face, ac_obj)
+
+	def write_ac_surface(self, ac_file):
+		surf_flags = self.ac_surf_flags.get_flags()
+		ac_file.write('SURF {0:#X}\n'.format(surf_flags))
+		ac_file.write('mat {0}\n'.format(self.mat))
+		ac_file.write('refs {0}\n'.format(len(self.refs)))
+		for n in range(len(self.refs)):
+			surf_ref = self.refs[n]
+			uv_ref = self.uv_refs[n]
+			ac_file.write('{0} {1} {2}\n'.format(surf_ref, uv_ref[0], uv_ref[0]))
+
+	def parse_blender_face(self, bl_face, ac_obj):
+		# Create basic vertex reference list (don't care about UV refs)
+		self.refs.append(bl_face.vertices_raw[0])
+		self.uv_refs.append([0,0])
+		self.refs.append(bl_face.vertices_raw[1])
+		self.uv_refs.append([0,0])
+		self.refs.append(bl_face.vertices_raw[2])
+		self.uv_refs.append([0,0])
+		# working on the basis that vertices are listed in ascending order - if the last vertex is less than the previous, it's a null vertex (so three sided poly)
+		if bl_face.vertices_raw[3] > bl_face.vertices_raw[2]:
+			self.refs.append(bl_face.vertices_raw[3])
+			self.uv_refs.append([0,0])
+
+		self.mat = ac_obj.ac_mats[bl_face.material_index]
+		self.ac_surf_flags.is_shaded = bl_face.use_smooth
+		
 class AcObj:
 	def __init__(
 			self,
 			export_config,
 			bl_obj,
 			):
-		self.ac_mats = []
-		self.name = bl_obj.name
+		self.ac_mats = {}
+		self.name = ''
 		self.export_config = export_config
+		self.bl_obj = bl_obj
+		self.bl_export_flag = False
+		self.type = 'world'			# Type of object
+		self.name = ''				# name of the object
+		self.data = ''				# custom data (mesh name)
+		self.tex_name = ''			# texture name (filename of texture)
+		self.texrep = [1,1]			# texture repeat
+		self.location = None		# translation location of the center relative to the parent object
+		self.rotation = None		# 3x3 rotational matrix for vertices
+		self.url = ''				# url of the object (??!)
+		self.crease = 30			# crease angle for smoothing
+		self.vert_list = []			# list of Vector(X,Y,Z) objects
+		self.surf_list = []			# list of attached surfaces
+		self.face_list = []			# flattened surface list
+		self.edge_list = []			# spare edge list (handles poly lines etc)
+		self.children = []			# child objects
+	
+		self.export_conf = export_config
+
+	def write_ac_output(self, ac_file):
+		ac_file.write('OBJECT {0}\n'.format(self.type))
+		if len(self.name) > 0:
+			ac_file.write('NAME "{0}"\n'.format(self.name))
+
+		if len(self.data) > 0:
+			ac_file.write('data {0}\n'.format(len(self.data)))
+			ac_file.write('{0}\n'.format(self.data))
+
+		if len(self.tex_name) > 0:
+			ac_file.write('texture {0}\n'.format(self.tex_name))
+			ac_file.write('texrep {0} {1}\n'.format(self.texrep))
+
+		if self.location:
+			ac_file.write('loc {0} {1} {2}\n'.format(self.location))
+
+		if self.rotation:
+			ac_file.write('rot {0} {1} {2}  {3} {4} {5}  {6} {7} {8}\n'.format(self.rotation))
+
+		if len(self.vert_list) > 0:
+			ac_file.write('numvert {0}\n'.format(len(self.vert_list)))
+			for vert in self.vert_list:
+				ac_file.write('{0:.8f} {1:.8f} {2:.8f}\n'.format(vert[0],vert[1],vert[2]))
+
+		if len(self.surf_list) > 0:
+			ac_file.write('numsurf {0}\n'.format(len(self.surf_list)))
+			for ac_surf in self.surf_list:
+				ac_surf.write_ac_surface(ac_file)
+
+		ac_file.write('kids {0}\n'.format(len(self.children)))
+		for kid in self.children:
+			kid.write_ac_output(ac_file)
+
+	def parse_blender_object(self, ac_mats):
+		sSubType = ''
+		if self.bl_obj != None:		
+			self.name = self.bl_obj.name
+			if self.bl_obj.type == 'LAMP':
+				self.type = 'lamp'
+				self.bl_export_flag = self.export_config.export_lamps
+			elif self.bl_obj.type in ['MESH', 'LATTICE', 'CURVE', 'SURFACE']:
+				self.type = 'poly'
+				self.bl_export_flag = True
+				if self.bl_obj.type == 'CURVE':
+					sSubType = 'Polyline'
+				elif self.bl_obj.type == 'SURFACE':
+					sSubType = 'closedPolyline'
+			elif self.bl_obj.type == 'EMPTY':
+				self.type = 'group'
+				self.bl_export_flag = True
+
+			if self.bl_export_flag:
+				if self.type == 'poly':
+					self.parse_blender_mesh(ac_mats)
+
+				if self.type == 'group':
+					self.parse_sub_objects(ac_mats)
+
+				if self.type == 'lamp':
+					self.parse_lamp()
+
+	def parse_lamp(self):
+		# Create Lamp information - I don't think AC3D does lamps...
+		self.bl_export_flag = False
+
+	def parse_sub_objects(self, ac_mats):
+		# Read the child objects and those who's parents are this object, we make child objects
+		for bl_obj in [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]:
+			ac_obj = AcObj(self.export_conf, bl_obj)
+			ac_obj.parse_blender_object(ac_mats)
+			if ac_obj.bl_export_flag:
+				self.children.append(ac_obj)
 
 
+	def parse_blender_mesh(self, ac_mats):
+		# Export materials out first
+		self.data = self.bl_obj.data.name
+		self.parse_blender_materials(self.bl_obj.material_slots, ac_mats)
+		self.parse_vertices()
+		self.parse_faces()
+
+	def parse_faces(self):
+		for bl_face in self.bl_obj.data.faces:
+			ac_surf = AcSurf(self.export_conf, bl_face, self)
+			self.surf_list.append(ac_surf)
+
+	def parse_vertices(self):
+		for vtex in self.bl_obj.data.vertices:
+			self.vert_list.append(vtex.co)
+		
+	def parse_blender_materials(self, material_slots, ac_mats):
+		mat_index = 0
+		for bl_mat in material_slots:
+			ac_mat = AcMat(self.export_conf)
+			ac_mat.from_blender_mat(bl_mat.material)
+
+			bUniqueMaterial = True
+			for mat in self.ac_mats:
+				if mat.same_as(ac_mat):
+					ac_mat = mat
+					bUniqueMaterial = False
+					continue
+
+			if bUniqueMaterial:
+				ac_mats.append(ac_mat)
+
+			# Blender to AC3d index cross-reference
+			self.ac_mats[mat_index] = ac_mats.index(ac_mat)
+			mat_index = mat_index + 1
+		
 class ExportConf:
 	def __init__(
 			self,
@@ -120,6 +308,7 @@ class ExportConf:
 			mircol_as_emis,
 			mircol_as_amb,
 			no_split,
+			export_lamps,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
@@ -130,18 +319,19 @@ class ExportConf:
 		self.global_coords = global_coords
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
+		self.export_lamps = export_lamps
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
 		self.ac_name = os.path.split(filepath)[1]
-		TRACE("Exporting to {0}".format(self.ac_name))
+		TRACE('Exporting to {0}'.format(self.ac_name))
 
 class ExportAC3D:
 	def __init__(
 			self,
 			operator,
 			context,
-			filepath="",
+			filepath='',
 			global_matrix=None,
 			use_selection=False,
 			skip_data=False,
@@ -149,6 +339,7 @@ class ExportAC3D:
 			mircol_as_emis=True,
 			mircol_as_amb=False,
 			no_split=True,
+			export_lamps=False,
 			):
 
 			self.export_conf = ExportConf(
@@ -162,34 +353,30 @@ class ExportAC3D:
 										mircol_as_emis,
 										mircol_as_amb,
 										no_split,
+										export_lamps,
 										)
 
 			self.ac_mats = []
-			self.ac_objects = []
+			self.ac_world = None
+
+			self.ac_world = AcObj(self.export_conf, None)
+
+			self.ac_world.parse_sub_objects(self.ac_mats)
 
 			# traverse the material and object trees to compile the initial list
-			for bl_obj in self.export_conf.context.scene.objects:
-				ac_obj = AcObj(self.export_conf, bl_obj)
-				for bl_mat in bl_obj.material_slots:
-					ac_mat = AcMat(self.export_conf)
-					ac_mat.from_blender_mat(bl_mat.material)
-
-					bUniqueMaterial = True
-					for mat in self.ac_mats:
-						if mat.same_as(ac_mat):
-							ac_mat = mat
-							bUniqueMaterial = False
-							continue
-
-					if bUniqueMaterial:
-						self.ac_mats.append(ac_mat)
-					if not ac_mat in ac_obj.ac_mats:
-						ac_obj.ac_mats.append(ac_mat)
+#			for bl_obj in self.export_conf.context.scene.objects:
+#				ac_obj = AcObj(self.export_conf, bl_obj)
+#				ac_obj.parse_blender_object(self.ac_mats)
+#				if ac_obj.bl_export_flag:
+#					self.ac_objects.append(ac_obj)
+					
 
 			# dump the contents of the lists to file
 			ac_file = open(filepath, 'w')
-			ac_file.write("AC3Db\n")
+			ac_file.write('AC3Db\n')
 			for ac_mat in self.ac_mats:
 				ac_mat.write_ac_material(ac_file)
+
+			self.ac_world.write_ac_output(ac_file)
 
 			ac_file.close()

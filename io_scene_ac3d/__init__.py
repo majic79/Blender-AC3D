@@ -237,7 +237,11 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
 							default=True,
 							)
-
+	export_lamps = BoolProperty(
+							name="Export Lamps",
+							description="Export lamps into AC3D file",
+							default=False,
+							)
 	def execute(self, context):
 		from . import export_ac3d
 		keywords = self.as_keywords(ignore=("axis_forward",
