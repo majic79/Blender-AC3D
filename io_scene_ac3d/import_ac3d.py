@@ -277,6 +277,51 @@ class AcObj:
 		# returning True indicates to cease parsing this object
 		return True
 
+	def from_pydata(self, mesh, vertices, edges, faces):
+		"""
+		Make a mesh from a list of verts/edges/faces
+		Until we have a nicer way to make geometry, use this.
+
+		:arg vertices: float triplets each representing (X, Y, Z) eg: [(0.0, 1.0, 0.5), ...].
+		:type vertices: iterable object
+		:arg edges: int pairs, each pair contains two indices to the *vertices* argument. eg: [(1, 2), ...]
+		:type edges: iterable object
+		:arg faces: iterator of faces, each faces contains three or four indices to the *vertices* argument. eg: [(5, 6, 8, 9), (1, 2, 3), ...]
+		:type faces: iterable object
+		"""
+		mesh.vertices.add(len(vertices))
+		mesh.edges.add(len(edges))
+		mesh.faces.add(len(faces))
+
+		vertices_flat = [f for v in vertices for f in v]
+		mesh.vertices.foreach_set("co", vertices_flat)
+		del vertices_flat
+
+#		edges_flat = [i for e in edges for i in e]
+#        self.edges.foreach_set("vertices", edges_flat)
+		
+		edges_flat = [e for e in edges]
+		TRACE("Edge Count: {0}".format(len(mesh.edges)))
+		for nEdge in range(len(mesh.edges)):
+			s_edge = mesh.edges[nEdge]
+			s_edge.vertices = edges_flat[nEdge]
+		del edges_flat
+
+		def treat_face(f):
+			if len(f) == 3:
+				if f[2] == 0:
+					return f[2], f[0], f[1], 0
+				else:
+					return f[0], f[1], f[2], 0
+			elif f[2] == 0 or f[3] == 0:
+				return f[2], f[3], f[0], f[1]
+			return f
+		TRACE("len faces = {0}".format(len(faces)))
+		faces_flat = [v for f in faces for v in treat_face(f)]
+		mesh.faces.foreach_set("vertices_raw", faces_flat)
+		del faces_flat
+	
+
 	'''
 	This function does the work of creating an object in blender and configuring it correctly
 	'''
@@ -300,42 +345,52 @@ class AcObj:
 			bl_mesh = bpy.data.meshes.new(meshname)
 			self.bl_obj = bpy.data.objects.new(self.name, bl_mesh)
 
+		# make sure we have something to work with
 		if self.vert_list and bl_mesh:
-			# make sure we have some vertices
-			
-			for surf in self.surf_list:
-				if len(surf.refs) > 4 or len(surf.refs) < 3:
-					TRACE("Error with polygon ref count! ({0})".format(len(surf.refs)))
-					continue
-				self.face_list.append(surf.get_faces())
-				self.edge_list.append(surf.get_edges())
-
-				# Material index is 1 based, the list we built is 0 based
-				ac_material = ac_matlist[surf.mat_index]
-				bl_material = ac_material.get_blender_material(self.tex_name)
-
-				if bl_material == None:
-					TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
-
-				fm_index = 0
-				if not bl_material.name in bl_mesh.materials:
-					bl_mesh.materials.append(bl_material)
-					fm_index = len(bl_mesh.materials)-1
-				else:
-					for mat in bl_mesh.materials:
-						if mat == bl_material:
-							continue
-						fm_index += 1
-					if fm_index > len(bl_mesh.materials):
-						TRACE("Failed to find material index")
-						fm_index = 0
-				self.face_mat_list.append(fm_index)
-				
-			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
 			bl_mesh.use_auto_smooth = self.import_config.use_auto_smooth
 			bl_mesh.auto_smooth_angle = radians(self.crease)
+			
+			for surf in self.surf_list:
+				surf_edges = surf.get_edges()
+				surf_face = surf.get_faces()
+				for edge in surf_edges:
+					self.edge_list.append(edge)
 
+				if len(surf.refs) > 4 or len(surf.refs) < 3:
+					# not bringing in faces (assumed that there are none in a poly-line)
+					TRACE("Treating surface as Poly-line (edge-count: {0})".format(len(surf_edges)))
+				else:
+
+					self.face_list.append(surf_face)
+
+					# Material index is 1 based, the list we built is 0 based
+					ac_material = ac_matlist[surf.mat_index]
+					bl_material = ac_material.get_blender_material(self.tex_name)
+
+					if bl_material == None:
+						TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
+
+					fm_index = 0
+					if not bl_material.name in bl_mesh.materials:
+						bl_mesh.materials.append(bl_material)
+						fm_index = len(bl_mesh.materials)-1
+					else:
+						for mat in bl_mesh.materials:
+							if mat == bl_material:
+								continue
+							fm_index += 1
+						if fm_index > len(bl_mesh.materials):
+							TRACE("Failed to find material index")
+							fm_index = 0
+
+					self.face_mat_list.append(fm_index)
+
+			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
+
+#			self.from_pydata(bl_mesh, self.vert_list, self.edge_list, self.face_list)
+
+				
 			face_mat = [m for m in self.face_mat_list]
 			bl_mesh.faces.foreach_set("material_index", face_mat)
 			del face_mat
@@ -344,26 +399,23 @@ class AcObj:
 				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
 
 				for f_index in range(len(self.surf_list)):
-					if len(self.surf_list[f_index].refs)> 4 or len(self.surf_list[f_index].refs) < 3:
-						# skip it (error will be noted above)
-						continue
+					if len(self.surf_list[f_index].refs)<= 4 and len(self.surf_list[f_index].refs) >= 3:
+						surf = self.surf_list[f_index]
 
-					surf = self.surf_list[f_index]
+						bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
 
-					bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
+						uv_tex.data[f_index].uv1=surf.uv_refs[0]
+						uv_tex.data[f_index].uv2=surf.uv_refs[1]
+						uv_tex.data[f_index].uv3=surf.uv_refs[2]
 
-					uv_tex.data[f_index].uv1=surf.uv_refs[0]
-					uv_tex.data[f_index].uv2=surf.uv_refs[1]
-					uv_tex.data[f_index].uv3=surf.uv_refs[2]
+						if len(surf.uv_refs) > 3:
+							uv_tex.data[f_index].uv4=surf.uv_refs[3]
 
-					if len(surf.uv_refs) > 3:
-						uv_tex.data[f_index].uv4=surf.uv_refs[3]
+						surf_material = bl_mesh.materials[self.face_mat_list[f_index]]
+						surf_image = surf_material.texture_slots[0].texture.image
 
-					surf_material = bl_mesh.materials[self.face_mat_list[f_index]]
-					surf_image = surf_material.texture_slots[0].texture.image
-
-					uv_tex.data[f_index].image = surf_image
-					uv_tex.data[f_index].use_image = True
+						uv_tex.data[f_index].image = surf_image
+						uv_tex.data[f_index].use_image = True
 
 				uv_tex.active = True
 				
@@ -456,6 +508,7 @@ class AcSurf:
 			self.refs.append(int(line[0]))
 			self.uv_refs.append([float(x) for x in line[1:3]])
 		return True
+
 	def get_faces(self):
 		# convert refs and surface type to faces
 		surf_faces = []
@@ -467,12 +520,13 @@ class AcSurf:
 		# convert refs and surface type to edges
 		surf_edges = []
 		if self.flags.type != 0:
+			# poly-line
 			for x in range(len(self.refs)-1):
-				surf_edge.append([self.refs[x],self.refs[x+1]])
+				surf_edges.append([self.refs[x],self.refs[x+1]])
 
 			if self.flags.type == 1:
-				# closed line
-				surf_edge.append([self.refs[len(refs)-1],self.refs[0]])
+				# closed poly-line
+				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
 		return surf_edges
 
 class ImportConf:
