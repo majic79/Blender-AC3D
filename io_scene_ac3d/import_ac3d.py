@@ -357,34 +357,38 @@ class AcObj:
 				for edge in surf_edges:
 					self.edge_list.append(edge)
 
-				if len(surf.refs) > 4 or len(surf.refs) < 3:
-					# not bringing in faces (assumed that there are none in a poly-line)
-					TRACE("Treating surface as Poly-line (edge-count: {0})".format(len(surf_edges)))
-				else:
-
-					self.face_list.append(surf_face)
-
-					# Material index is 1 based, the list we built is 0 based
-					ac_material = ac_matlist[surf.mat_index]
-					bl_material = ac_material.get_blender_material(self.tex_name)
-
-					if bl_material == None:
-						TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
-
-					fm_index = 0
-					if not bl_material.name in bl_mesh.materials:
-						bl_mesh.materials.append(bl_material)
-						fm_index = len(bl_mesh.materials)-1
+				if surf.flags.type == 0:
+					# test for invalid face (ie, >4 vertices)
+					if len(surf.refs) > 4 or len(surf.refs) < 3:
+						# not bringing in faces (assumed that there are none in a poly-line)
+						TRACE("Treating face surface as Poly-line (edge-count: {0})".format(len(surf_edges)))
 					else:
-						for mat in bl_mesh.materials:
-							if mat == bl_material:
-								continue
-							fm_index += 1
-						if fm_index > len(bl_mesh.materials):
-							TRACE("Failed to find material index")
-							fm_index = 0
 
-					self.face_mat_list.append(fm_index)
+						self.face_list.append(surf_face)
+
+						# Material index is 1 based, the list we built is 0 based
+						ac_material = ac_matlist[surf.mat_index]
+						bl_material = ac_material.get_blender_material(self.tex_name)
+
+						if bl_material == None:
+							TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
+
+						fm_index = 0
+						if not bl_material.name in bl_mesh.materials:
+							bl_mesh.materials.append(bl_material)
+							fm_index = len(bl_mesh.materials)-1
+						else:
+							for mat in bl_mesh.materials:
+								if mat == bl_material:
+									continue
+								fm_index += 1
+							if fm_index > len(bl_mesh.materials):
+								TRACE("Failed to find material index")
+								fm_index = 0
+						self.face_mat_list.append(fm_index)
+				else:
+					# treating as a polyline (nothing more to do)
+					pass
 
 			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
@@ -512,7 +516,8 @@ class AcSurf:
 	def get_faces(self):
 		# convert refs and surface type to faces
 		surf_faces = []
-		if self.flags.type == 0:
+		# make sure it's a face type polygon and that there's the right number of vertices
+		if self.flags.type == 0 and len(self.refs) in [3,4]:
 			surf_faces = self.refs
 		return surf_faces
 
