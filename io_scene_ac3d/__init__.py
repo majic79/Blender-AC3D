@@ -35,11 +35,11 @@ bl_info = {
 	"description": "AC3D model exporter for blender.",
 	"author": "Chris Marr",
 	"version": (2,0),
-	"blender" : (2,5,9),
+	"blender" : (2,6,0),
 	"api": 36079,
 	"location": "File > Import-Export",
 	"warning": "",
-	"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/ImportAC3D",
+	"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/ImportAC3D",
 	"tracker_url": "",
 	"category": "Import-Export"
 }
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
 class ImportAC3D(bpy.types.Operator, ImportHelper):
 	'''Import from AC3D file format (.ac)'''
-	bl_idname = 'import_mesh.import_ac3d'
+	bl_idname = 'import_scene.import_ac3d'
 	bl_label = 'Import AC3D'
 	bl_options = {'PRESET'}	
 
@@ -171,7 +171,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 
 class ExportAC3D(bpy.types.Operator, ExportHelper):
 	'''Export to AC3D file format (.ac)'''
-	bl_idname = 'export_mesh.export_ac3d'
+	bl_idname = 'export_scene.export_ac3d'
 	bl_label = 'Export AC3D'
 	bl_options = {'PRESET'}
 

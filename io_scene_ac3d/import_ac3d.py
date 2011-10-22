@@ -615,13 +615,13 @@ class ImportAC3D:
 		self.oblist = []
 		self.matlist = []
 
-		operator.report('INFO', "Attempting import: {file}".format(file=filepath))
+		operator.report({'INFO'}, "Attempting import: {file}".format(file=filepath))
 
 		# Check to make sure we're working with a valid AC3D file
 		ac_file = open(filepath, 'r')
 		self.header = ac_file.readline().strip()
 		if len(self.header) != 5:
-			operator.report('ERROR',"Invalid file header length: {0}".format(self.header))
+			operator.report({'ERROR'},"Invalid file header length: {0}".format(self.header))
 			ac_file.close()
 			return None
 
@@ -629,7 +629,7 @@ class ImportAC3D:
 		AC3D_header = self.header[:4]
 		AC3D_ver = self.header[4:5]
 		if AC3D_header != 'AC3D':
-			operator.report('ERROR',"Invalid file header: {0}".format(self.header))
+			operator.report({'ERROR'},"Invalid file header: {0}".format(self.header))
 			ac_file.close()
 			return None
 
@@ -654,7 +654,7 @@ class ImportAC3D:
 	'''
 	def report_error(self, message):
 		TRACE(message)
-		self.import_config.operator.report('ERROR',message)
+		self.import_config.operator.report({'ERROR'},message)
 
 	'''
 	read our validated .ac file
