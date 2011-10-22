@@ -16,6 +16,24 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+'''
+This file is a complete reboot of the AC3D export script that is used to export .ac format file into blender.
+
+Reference to the .ac format is found here:
+http://www.inivis.com/ac3d/man/ac3dfileformat.html
+
+Some noted points that are important for consideration:
+ - AC3D appears to use Left Handed axes, but with Y oriented "Up". Blender uses Right Handed axes, the export does provide a rotation matrix applied to the world object that corrects this, so "Up" in the blender becomes "Up" in the .AC file - it's configurable, so you can change how it rotates...
+ - AC3D supports only one texture per surface. This is a UV texture map, so only blenders texmap is exported
+ - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender. The export uses a comparison of material properties to see if a material is the same as another one and then uses that material index for the .ac file.
+
+TODO: Add ability to only export selected items
+TODO: Export UV refs
+TODO: Export textures to .ac location
+TODO: Test....
+
+'''
+
 
 import os
 import struct
@@ -101,18 +119,18 @@ class AcSurf:
 		def __init__(
 				self,
 				surf_type,
-				is_shaded,
+				is_smooth,
 				is_twosided,
 				):
 			self.surf_type = surf_type
-			self.is_shaded = is_shaded
-			self.is_twosided = is_twosided
+			self.smooth_shaded = is_smooth
+			self.twosided = is_twosided
 
 		def get_flags(self):
 			n = self.surf_type & 0x0f
-			if self.is_shaded:
+			if self.smooth_shaded:
 				n = n | 0x10
-			if self.is_twosided:
+			if self.twosided:
 				n = n | 0x20
 			return n
 
@@ -120,14 +138,15 @@ class AcSurf:
 			self,
 			export_config,
 			bl_face,
+			is_two_sided,
 			ac_obj,
 			):
 		self.export_config = export_config
 		self.mat = 0		# material index for this surface
 		self.refs = []		# list of vertex references from the parent mesh
 		self.uv_refs = []	# list of tuples with the UV co-ordinates of this vertex
-
-		self.ac_surf_flags = self.AcSurfFlags(0, True, False)
+		self.is_two_sided = is_two_sided
+		self.ac_surf_flags = self.AcSurfFlags(0, False, True)
 
 		self.parse_blender_face(bl_face, ac_obj)
 
@@ -142,7 +161,7 @@ class AcSurf:
 			ac_file.write('{0} {1} {2}\n'.format(surf_ref, uv_ref[0], uv_ref[0]))
 
 	def parse_blender_face(self, bl_face, ac_obj):
-		# Create basic vertex reference list (don't care about UV refs)
+		# Create basic vertex reference list (TODO: sort out UV refs)
 		self.refs.append(bl_face.vertices_raw[0])
 		self.uv_refs.append([0,0])
 		self.refs.append(bl_face.vertices_raw[1])
@@ -150,12 +169,13 @@ class AcSurf:
 		self.refs.append(bl_face.vertices_raw[2])
 		self.uv_refs.append([0,0])
 		# working on the basis that vertices are listed in ascending order - if the last vertex is less than the previous, it's a null vertex (so three sided poly)
-		if bl_face.vertices_raw[3] > bl_face.vertices_raw[2]:
+		if bl_face.vertices_raw[3] != 0:
 			self.refs.append(bl_face.vertices_raw[3])
 			self.uv_refs.append([0,0])
 
 		self.mat = ac_obj.ac_mats[bl_face.material_index]
-		self.ac_surf_flags.is_shaded = bl_face.use_smooth
+		self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
+		self.ac_surf_flags.twosided = self.is_two_sided
 		
 class AcObj:
 	def __init__(
@@ -188,7 +208,7 @@ class AcObj:
 	def write_ac_output(self, ac_file):
 		ac_file.write('OBJECT {0}\n'.format(self.type))
 		if len(self.name) > 0:
-			ac_file.write('NAME "{0}"\n'.format(self.name))
+			ac_file.write('name "{0}"\n'.format(self.name))
 
 		if len(self.data) > 0:
 			ac_file.write('data {0}\n'.format(len(self.data)))
@@ -252,28 +272,34 @@ class AcObj:
 
 	def parse_sub_objects(self, ac_mats):
 		# Read the child objects and those who's parents are this object, we make child objects
-		for bl_obj in [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]:
+		if self.export_conf.use_selection:
+			bl_obj_list = [_obj for _obj in self.export_conf.selected_objects if _obj.parent == self.bl_obj]
+		else:
+			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]
+
+		for bl_obj in bl_obj_list:
 			ac_obj = AcObj(self.export_conf, bl_obj)
 			ac_obj.parse_blender_object(ac_mats)
 			if ac_obj.bl_export_flag:
 				self.children.append(ac_obj)
-
+		
+		del bl_obj_list
 
 	def parse_blender_mesh(self, ac_mats):
 		# Export materials out first
 		self.data = self.bl_obj.data.name
 		self.parse_blender_materials(self.bl_obj.material_slots, ac_mats)
 		self.parse_vertices()
-		self.parse_faces()
+		self.parse_faces(self.bl_obj.data.show_double_sided)
 
-	def parse_faces(self):
+	def parse_faces(self, bl_two_sided):
 		for bl_face in self.bl_obj.data.faces:
-			ac_surf = AcSurf(self.export_conf, bl_face, self)
+			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, self)
 			self.surf_list.append(ac_surf)
 
 	def parse_vertices(self):
 		for vtex in self.bl_obj.data.vertices:
-			self.vert_list.append(vtex.co)
+			self.vert_list.append((self.export_conf.global_matrix * vtex.co))
 		
 	def parse_blender_materials(self, material_slots, ac_mats):
 		mat_index = 0
@@ -362,14 +388,6 @@ class ExportAC3D:
 			self.ac_world = AcObj(self.export_conf, None)
 
 			self.ac_world.parse_sub_objects(self.ac_mats)
-
-			# traverse the material and object trees to compile the initial list
-#			for bl_obj in self.export_conf.context.scene.objects:
-#				ac_obj = AcObj(self.export_conf, bl_obj)
-#				ac_obj.parse_blender_object(self.ac_mats)
-#				if ac_obj.bl_export_flag:
-#					self.ac_objects.append(ac_obj)
-					
 
 			# dump the contents of the lists to file
 			ac_file = open(filepath, 'w')

@@ -22,6 +22,7 @@ import struct
 
 import bpy
 import mathutils
+from mathutils import Vector, Euler
 from math import radians
 from bpy import *
 from bpy_extras.image_utils import load_image
@@ -29,15 +30,17 @@ from bpy_extras.image_utils import load_image
 '''
 This file is a reboot of the AC3D import script that is used to import .ac format file into blender.
 
-The original work carried out by Willian P Gerano was used to learn Python and Blender, but inherent issues and a desire to do better has prompted a reboot
+The original work carried out by Willian P Gerano was used to learn Python and Blender, but inherent issues and a desire to do better has prompted a complete re-write
 
 Reference to the .ac format is found here:
 http://www.inivis.com/ac3d/man/ac3dfileformat.html
 
 Some noted points that are important for consideration:
- - AC3D appears to use Left Handed axes, but with Y oriented "Up". Blender uses Right Handed axes
- - AC3D supports only one texture per surface.
- - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender
+ - AC3D appears to use Left Handed axes, but with Y oriented "Up". Blender uses Right Handed axes, the import does provide a rotation matrix applied to the world object that corrects this, so "Up" in the AC file appears as "Up" in blender - it's configurable, so you can change how it rotates...
+ - AC3D supports only one texture per surface. This is a UV texture map, so it's imported as such in blender
+ - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender (more of an issue for the export routine)
+ - AC3D supports individual face twosidedness, blender's twosidedness is per-object
+TODO: Add setting so that .AC file is brought in relative to the 3D cursor
 
 '''
 
@@ -214,7 +217,7 @@ class AcObj:
 		for n in range(vertex_count):
 			line = ac_file.readline()
 			line = line.strip().split()
-			self.vert_list.append([float(x) for x in line])
+			self.vert_list.append(self.import_config.global_matrix * Vector([float(x) for x in line]))
 
 	def read_surfaces(self, ac_file, toks):
 		surf_count = int(toks[1])
@@ -238,7 +241,7 @@ class AcObj:
 		return False
 
 	def read_location(self, ac_file, toks):
-		self.location=[float(x) for x in toks[1:4]]
+		self.location=(self.import_config.global_matrix * Vector([float(x) for x in toks[1:4]]))
 		return False
 
 	def read_rotation(self, ac_file, toks):
@@ -278,6 +281,7 @@ class AcObj:
 		return True
 
 	def from_pydata(self, mesh, vertices, edges, faces):
+		# majic: we've adapted the default import routine to make it work correctly for polylines etc! Probably ought to put in a bug report about how the default handles it
 		"""
 		Make a mesh from a list of verts/edges/faces
 		Until we have a nicer way to make geometry, use this.
@@ -329,6 +333,7 @@ class AcObj:
 
 		if self.type == 'world':
 			self.name = self.import_config.ac_name
+			self.rotation = self.import_config.global_matrix
 		bl_mesh = None
 		if self.type == 'group':
 			# Create an empty object
@@ -344,6 +349,10 @@ class AcObj:
 				meshname = self.data
 			bl_mesh = bpy.data.meshes.new(meshname)
 			self.bl_obj = bpy.data.objects.new(self.name, bl_mesh)
+
+		# setup parent object
+		if self.ac_parent:
+			self.bl_obj.parent = self.ac_parent.bl_obj
 
 		# make sure we have something to work with
 		if self.vert_list and bl_mesh:
@@ -392,8 +401,6 @@ class AcObj:
 
 			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
-#			self.from_pydata(bl_mesh, self.vert_list, self.edge_list, self.face_list)
-
 				
 			face_mat = [m for m in self.face_mat_list]
 			bl_mesh.faces.foreach_set("material_index", face_mat)
@@ -402,9 +409,13 @@ class AcObj:
 			if self.tex_name != '':
 				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
 
+				two_sided_lighting = False
+
 				for f_index in range(len(self.surf_list)):
 					if len(self.surf_list[f_index].refs)<= 4 and len(self.surf_list[f_index].refs) >= 3:
 						surf = self.surf_list[f_index]
+						# If one surface is twosided, they all will be...
+						two_sided_lighting |= surf.flags.two_sided
 
 						bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
 
@@ -420,6 +431,8 @@ class AcObj:
 
 						uv_tex.data[f_index].image = surf_image
 						uv_tex.data[f_index].use_image = True
+
+				bl_mesh.show_twosided = two_sided_lighting
 
 				uv_tex.active = True
 				
@@ -446,15 +459,12 @@ class AcObj:
 				bUseLink = False
 
 			obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
-			obj.bl_obj.parent = self.bl_obj
-			if self.type == 'world':
-				obj.bl_obj.rotation_euler = self.import_config.global_matrix.to_euler()
 
 
 		if bl_mesh:
 			bl_mesh.calc_normals()
 			bl_mesh.update(calc_edges=True)
-			
+		
 class AcSurf:
 	class AcSurfFlags:
 		def __init__(self, flags):
@@ -643,7 +653,8 @@ class ImportAC3D:
 	Simplifies the reporting of errors to the user
 	'''
 	def report_error(self, message):
-		self.operator.report('ERROR',message)
+		TRACE(message)
+		self.import_config.operator.report('ERROR',message)
 
 	'''
 	read our validated .ac file
