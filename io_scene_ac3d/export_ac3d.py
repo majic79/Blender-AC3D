@@ -139,12 +139,14 @@ class AcSurf:
 			export_config,
 			bl_face,
 			is_two_sided,
+			uv_tex_face,
 			ac_obj,
 			):
 		self.export_config = export_config
 		self.mat = 0		# material index for this surface
 		self.refs = []		# list of vertex references from the parent mesh
-		self.uv_refs = []	# list of tuples with the UV co-ordinates of this vertex
+		self.uv_refs = []	# list of UV referense for texture mapping
+		self.uv_face = uv_tex_face
 		self.is_two_sided = is_two_sided
 		self.ac_surf_flags = self.AcSurfFlags(0, False, True)
 
@@ -158,20 +160,29 @@ class AcSurf:
 		for n in range(len(self.refs)):
 			surf_ref = self.refs[n]
 			uv_ref = self.uv_refs[n]
-			ac_file.write('{0} {1} {2}\n'.format(surf_ref, uv_ref[0], uv_ref[0]))
+			ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
 
 	def parse_blender_face(self, bl_face, ac_obj):
-		# Create basic vertex reference list (TODO: sort out UV refs)
+		# Create basic vertex reference list
 		self.refs.append(bl_face.vertices_raw[0])
-		self.uv_refs.append([0,0])
 		self.refs.append(bl_face.vertices_raw[1])
-		self.uv_refs.append([0,0])
 		self.refs.append(bl_face.vertices_raw[2])
-		self.uv_refs.append([0,0])
+
+		if self.uv_face:
+			self.uv_refs.append(self.uv_face.uv1)
+			self.uv_refs.append(self.uv_face.uv2)
+			self.uv_refs.append(self.uv_face.uv3)
+		else:			
+			self.uv_refs.append([0,0])
+			self.uv_refs.append([0,0])
+			self.uv_refs.append([0,0])
 		# working on the basis that vertices are listed in ascending order - if the last vertex is less than the previous, it's a null vertex (so three sided poly)
 		if bl_face.vertices_raw[3] != 0:
 			self.refs.append(bl_face.vertices_raw[3])
-			self.uv_refs.append([0,0])
+			if self.uv_face:
+				self.uv_refs.append(self.uv_face.uv4)
+			else:
+				self.uv_refs.append([0,0])
 
 		self.mat = ac_obj.ac_mats[bl_face.material_index]
 		self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
@@ -293,10 +304,21 @@ class AcObj:
 		self.parse_faces(self.bl_obj.data.show_double_sided)
 
 	def parse_faces(self, bl_two_sided):
-		for bl_face in self.bl_obj.data.faces:
-			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, self)
-			self.surf_list.append(ac_surf)
 
+		uv_tex = None
+
+		if len(self.bl_obj.data.uv_textures):
+			uv_tex = self.bl_obj.data.uv_textures[0]
+
+		for face_idx in range(len(self.bl_obj.data.faces)):
+			bl_face = self.bl_obj.data.faces[face_idx]
+			tex_face = None
+			if uv_tex:
+				tex_face = uv_tex.data[face_idx]
+
+			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, tex_face, self)
+			self.surf_list.append(ac_surf)
+		
 	def parse_vertices(self):
 		for vtex in self.bl_obj.data.vertices:
 			self.vert_list.append((self.export_conf.global_matrix * vtex.co))
@@ -308,7 +330,7 @@ class AcObj:
 			ac_mat.from_blender_mat(bl_mat.material)
 
 			bUniqueMaterial = True
-			for mat in self.ac_mats:
+			for mat in ac_mats:
 				if mat.same_as(ac_mat):
 					ac_mat = mat
 					bUniqueMaterial = False
@@ -320,6 +342,9 @@ class AcObj:
 			# Blender to AC3d index cross-reference
 			self.ac_mats[mat_index] = ac_mats.index(ac_mat)
 			mat_index = mat_index + 1
+	
+	def parse_blender_textures(self):
+		pass
 		
 class ExportConf:
 	def __init__(
