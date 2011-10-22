@@ -430,11 +430,12 @@ class AcObj:
 						surf_image = surf_material.texture_slots[0].texture.image
 
 						uv_tex.data[f_index].image = surf_image
-						uv_tex.data[f_index].use_image = True
+#						uv_tex.data[f_index].use_image = True
 
-				bl_mesh.show_twosided = two_sided_lighting
+				bl_mesh.show_double_sided = two_sided_lighting
 
 				uv_tex.active = True
+				uv_tex.active_render = True
 				
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
@@ -442,7 +443,12 @@ class AcObj:
 			self.bl_obj.rotation_euler = self.rotation.to_euler()
 
 			self.bl_obj.location = self.location
+			
 			self.import_config.context.scene.objects.link(self.bl_obj)
+# There's a bug somewhere - this ought to work....
+			self.import_config.context.scene.objects.active = self.bl_obj
+#			bpy.ops.object.origin_set('ORIGIN_GEOMETRY', 'MEDIAN')
+			
 
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
 
