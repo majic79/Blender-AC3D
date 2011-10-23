@@ -28,7 +28,6 @@ Some noted points that are important for consideration:
  - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender. The export uses a comparison of material properties to see if a material is the same as another one and then uses that material index for the .ac file.
 
 TODO: Add ability to only export selected items
-TODO: Export UV refs
 TODO: Export textures to .ac location
 TODO: Test....
 
