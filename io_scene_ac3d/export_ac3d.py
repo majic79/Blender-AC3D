@@ -203,8 +203,15 @@ class AcObj:
 		self.data = ''				# custom data (mesh name)
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
-		self.location = None		# translation location of the center relative to the parent object
-		self.rotation = None		# 3x3 rotational matrix for vertices
+		if bl_obj:
+			self.location = export_config.global_matrix * bl_obj.location
+			rotation = bl_obj.rotation_euler.to_matrix()
+			#TRACE("Object: {0}".format(rotation))
+			
+			self.rotation = rotation
+		else:
+			self.location = None		# translation location of the center relative to the parent object
+			self.rotation = None		# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []			# list of Vector(X,Y,Z) objects
@@ -229,10 +236,11 @@ class AcObj:
 			ac_file.write('texrep {0} {1}\n'.format(self.texrep))
 
 		if self.location:
-			ac_file.write('loc {0} {1} {2}\n'.format(self.location))
+			ac_file.write('loc {0} {1} {2}\n'.format(self.location[0],self.location[1],self.location[2]))
 
 		if self.rotation:
-			ac_file.write('rot {0} {1} {2}  {3} {4} {5}  {6} {7} {8}\n'.format(self.rotation))
+			rot = self.rotation
+			ac_file.write('rot {0} {1} {2}  {3} {4} {5}  {6} {7} {8}\n'.format(rot[0][0],rot[0][1],rot[0][2],rot[1][0],rot[1][1],rot[1][2],rot[2][0],rot[2][1],rot[2][2]))
 
 		if len(self.vert_list) > 0:
 			ac_file.write('numvert {0}\n'.format(len(self.vert_list)))
@@ -283,7 +291,7 @@ class AcObj:
 	def parse_sub_objects(self, ac_mats):
 		# Read the child objects and those who's parents are this object, we make child objects
 		if self.export_conf.use_selection:
-			bl_obj_list = [_obj for _obj in self.export_conf.selected_objects if _obj.parent == self.bl_obj]
+			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj and _obj.select == True]
 		else:
 			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]
 
@@ -405,6 +413,8 @@ class ExportAC3D:
 										no_split,
 										export_lamps,
 										)
+
+			#TRACE("Global: {0}".format(global_matrix))
 
 			self.ac_mats = []
 			self.ac_world = None
