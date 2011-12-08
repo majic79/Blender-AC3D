@@ -40,6 +40,7 @@ import struct
 import bpy
 import mathutils
 from math import radians
+from mathutils import Vector, Euler, Matrix
 from bpy import *
 
 DEBUG = True
@@ -47,6 +48,8 @@ DEBUG = True
 def TRACE(message):
 	if DEBUG:
 		print(message)
+
+###########################
 
 class AcMat:
 	'''
@@ -183,7 +186,8 @@ class AcSurf:
 			else:
 				self.uv_refs.append([0,0])
 
-		self.mat = ac_obj.ac_mats[bl_face.material_index]
+		if bl_face.material_index != 0:
+			self.mat = ac_obj.ac_mats[bl_face.material_index]
 		self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
 		self.ac_surf_flags.twosided = self.is_two_sided
 		
@@ -195,6 +199,7 @@ class AcObj:
 			):
 		self.ac_mats = {}
 		self.name = ''
+		self.mesh = None
 		self.export_config = export_config
 		self.bl_obj = bl_obj
 		self.bl_export_flag = False
@@ -204,11 +209,25 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		if bl_obj:
-			self.location = export_config.global_matrix * bl_obj.location
-			rotation = bl_obj.rotation_euler.to_matrix()
-			#TRACE("Object: {0}".format(rotation))
+			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
+
+			#matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
+			global_matrix_abs = Matrix(([abs(a) for a in export_config.global_matrix[0]], [abs(a) for a in export_config.global_matrix[1]], [abs(a) for a in export_config.global_matrix[2]]))
+			scale = global_matrix_abs * bl_obj.scale
+			matrix_scale = Matrix([[scale[0], 0, 0], [0, scale[1], 0], [0, 0, scale[2]]])
+			print('scale={0}'.format(matrix_scale))
+
+			rotation = bl_obj.matrix_local.to_quaternion()
+			rotation.axis = export_config.global_matrix * rotation.axis
+			rotation.angle *= -1
 			
-			self.rotation = rotation
+			rotation = Euler(export_config.global_matrix * Vector(bl_obj.matrix_local.to_euler()[:]))
+			
+			print('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
+
+			self.rotation = matrix_scale * rotation.to_matrix()
+
+			#TRACE("Object: {0}".format(rotation))
 		else:
 			self.location = None		# translation location of the center relative to the parent object
 			self.rotation = None		# 3x3 rotational matrix for vertices
@@ -258,8 +277,9 @@ class AcObj:
 
 	def parse_blender_object(self, ac_mats):
 		sSubType = ''
-		if self.bl_obj != None:		
+		if self.bl_obj != None:
 			self.name = self.bl_obj.name
+			self.mesh = self.bl_obj.data
 			if self.bl_obj.type == 'LAMP':
 				self.type = 'lamp'
 				self.bl_export_flag = self.export_config.export_lamps
@@ -270,6 +290,8 @@ class AcObj:
 					sSubType = 'Polyline'
 				elif self.bl_obj.type == 'SURFACE':
 					sSubType = 'closedPolyline'
+				elif self.bl_obj.type == 'MESH':
+					self.mesh = self.bl_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
 			elif self.bl_obj.type == 'EMPTY':
 				self.type = 'group'
 				self.bl_export_flag = True
@@ -278,8 +300,8 @@ class AcObj:
 				if self.type == 'poly':
 					self.parse_blender_mesh(ac_mats)
 
-				if self.type == 'group':
-					self.parse_sub_objects(ac_mats)
+#				if self.type == 'group':
+				self.parse_sub_objects(ac_mats)
 
 				if self.type == 'lamp':
 					self.parse_lamp()
@@ -314,11 +336,11 @@ class AcObj:
 
 		uv_tex = None
 
-		if len(self.bl_obj.data.uv_textures):
-			uv_tex = self.bl_obj.data.uv_textures[0]
+		if len(self.mesh.uv_textures):
+			uv_tex = self.mesh.uv_textures[0]
 
-		for face_idx in range(len(self.bl_obj.data.faces)):
-			bl_face = self.bl_obj.data.faces[face_idx]
+		for face_idx in range(len(self.mesh.faces)):
+			bl_face = self.mesh.faces[face_idx]
 			tex_face = None
 			if uv_tex:
 				tex_face = uv_tex.data[face_idx]
@@ -327,7 +349,7 @@ class AcObj:
 			self.surf_list.append(ac_surf)
 		
 	def parse_vertices(self):
-		for vtex in self.bl_obj.data.vertices:
+		for vtex in self.mesh.vertices:
 			self.vert_list.append((self.export_conf.global_matrix * vtex.co))
 		
 	def parse_blender_materials(self, material_slots, ac_mats):
