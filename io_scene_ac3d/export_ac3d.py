@@ -29,12 +29,12 @@ Some noted points that are important for consideration:
 
 TODO: Add ability to only export selected items
 TODO: Export textures to .ac location
-TODO: Test....
 
 '''
 
 
 import os
+import shutil
 import struct
 
 import bpy
@@ -232,8 +232,8 @@ class AcObj:
 			ac_file.write('{0}\n'.format(self.data))
 
 		if len(self.tex_name) > 0:
-			ac_file.write('texture {0}\n'.format(self.tex_name))
-			ac_file.write('texrep {0} {1}\n'.format(self.texrep))
+			ac_file.write('texture "{0}"\n'.format(self.tex_name))
+			ac_file.write('texrep {0} {1}\n'.format(self.texrep[0], self.texrep[1]))
 
 		if self.location:
 			ac_file.write('loc {0} {1} {2}\n'.format(self.location[0],self.location[1],self.location[2]))
@@ -332,9 +332,10 @@ class AcObj:
 		
 	def parse_blender_materials(self, material_slots, ac_mats):
 		mat_index = 0
-		for bl_mat in material_slots:
+		for bl_mat_sl in material_slots:
 			ac_mat = AcMat(self.export_conf)
-			ac_mat.from_blender_mat(bl_mat.material)
+			bl_mat = bl_mat_sl.material
+			ac_mat.from_blender_mat(bl_mat)
 
 			bUniqueMaterial = True
 			for mat in ac_mats:
@@ -346,11 +347,36 @@ class AcObj:
 			if bUniqueMaterial:
 				ac_mats.append(ac_mat)
 
+			# Check to see if there's a texture...
+			if bl_mat.use_face_texture and self.tex_name=='':
+				# export it
+				for tex_slot in bl_mat.texture_slots:
+					if tex_slot and tex_slot.texture_coords == 'UV':
+						bl_tex = tex_slot.texture
+						bl_im = bl_tex.image
+						tex_path = os.path.split(bl_im.filepath)
+						tex_name=tex_path[1]
+						export_tex = os.path.join(self.export_conf.exportdir, tex_name)
+						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
+						if not os.path.exists(export_tex):
+							if bl_im.packed_file:
+								bl_im.file_format = 'PNG'
+								bl_im.filepath = export_tex
+								bl_im.unpack('WRITE_LOCAL')
+							else:
+								shutil.copy(bl_im.filepath, export_tex)
+						# else:
+							# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
+						
+						self.tex_name = tex_name
+						self.texrep = [1,1]
+
 			# Blender to AC3d index cross-reference
 			self.ac_mats[mat_index] = ac_mats.index(ac_mat)
 			mat_index = mat_index + 1
 	
 	def parse_blender_textures(self):
+		
 		pass
 		
 class ExportConf:
@@ -380,7 +406,7 @@ class ExportConf:
 		self.export_lamps = export_lamps
 
 		# used to determine relative file paths
-		self.importdir = os.path.dirname(filepath)
+		self.exportdir = os.path.dirname(filepath)
 		self.ac_name = os.path.split(filepath)[1]
 		TRACE('Exporting to {0}'.format(self.ac_name))
 
