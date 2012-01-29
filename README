@@ -20,12 +20,21 @@ Go to File->Import->AC3D (.ac), select a file and let it do the work
 
 Known Issues:
 
-	- The export script includes code to export packed .blend images. This is untested...
-	- The exporter will either export everything, or everything that's selected. Default behaviour is to 
-		export everything, if you want to only export those items that you can see (ie, in the render scene),
-		then select all those items and check the "Selection Only" option on the export dialog.
-	- Some .ac files have a "lamp" object - but I don't understand how it works in .ac so blender lamps are not exported (the option is ignored at the moment)
-	- There's an option "Export Render Layer" - ie, only export what's currently visible - this doesn't work, but is in the plan
+ - Exporter:
+	 * Export packed .blend images is untested...
+	 * It will either export everything, or everything that's selected. Default
+     behaviour is to export everything, if you want to only export those items
+     that you can see (ie, in the render scene), then select all those items and
+     check the "Selection Only" option on the export dialog.
+   * There's an option "Export Render Layer" - ie, only export what's currently
+     visible - this doesn't work, but is in the plan
+   * Relative texturepaths don't get exported (path starting with //)
+
+ - Importer:
+   * Smoothing seems not to be imported
+
+ - Some .ac files have a "lamp" object - but I don't understand how it works in
+   .ac so blender lamps are not exported (the option is ignored at the moment)
 
 Things to come:
 	- I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export

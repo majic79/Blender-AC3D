@@ -428,7 +428,9 @@ class AcObj:
 						export_tex = os.path.join(self.export_conf.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
 # TODO: Optionally over-write existing textures
-						if not os.path.exists(export_tex):
+						if not os.path.exists(bl_im.filepath):
+							TRACE('Warning: Texture doesn\'t exists: {0}'.format(bl_im.filepath))
+						elif not os.path.exists(export_tex):
 							if bl_im.packed_file:
 								bl_im.file_format = 'PNG'
 								bl_im.filepath = export_tex
