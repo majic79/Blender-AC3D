@@ -30,11 +30,16 @@ Known Issues:
 Things to come:
 	- I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
 
+Follow the discussion at:
+
+http://www.flightgear.org/forums/viewtopic.php?f=18&t=13442
+
 Acknowledgments:
 
 The Blender team: (http://www.blender.org) for such a fine piece of software
 Willian P Gerano for his original work (the very first version of this script was a port of his original work)
 Rene Negree for his help with the importer, tips on the texture mapping and materials and user settings saving
+The FlightGear community for their help in testing and feedback for development
 
 # ##### BEGIN GPL LICENSE BLOCK #####
 #
