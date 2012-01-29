@@ -235,16 +235,16 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="export mirror colour as ambient colour",
 							default=False,
 							)
+	export_lamps = BoolProperty(
+							name="Export Lamps",
+							description="Export lamps into AC3D file",
+							default=False,
+							)
 # This behaviour from the original exporter - not applicable?
 #	no_split = BoolProperty(
 #							name="No Split",
 #							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
 #							default=True,
-#							)
-#	export_lamps = BoolProperty(
-#							name="Export Lamps",
-#							description="Export lamps into AC3D file",
-#							default=False,
 #							)
 	def execute(self, context):
 		from . import export_ac3d

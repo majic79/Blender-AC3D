@@ -322,9 +322,9 @@ class AcObj:
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
 		self.parse_blender_materials(self.bl_obj.material_slots, ac_mats)
 		self.parse_vertices()
-		self.parse_faces(self.bl_obj.data.show_double_sided, self.bl_obj.data.materials)
+		self.parse_faces(self.bl_obj.data.show_double_sided)
 
-	def parse_faces(self, bl_two_sided, bl_mat_slots):
+	def parse_faces(self, bl_two_sided):
 
 		uv_tex = None
 
@@ -337,7 +337,7 @@ class AcObj:
 			if uv_tex:
 				tex_face = uv_tex.data[face_idx]
 
-			ac_surf = AcSurf(self.export_conf, bl_face, bl_mat_slots, bl_two_sided, tex_face, self)
+			ac_surf = AcSurf(self.export_conf, bl_face, self.bl_obj.data.materials, bl_two_sided, tex_face, self)
 			self.surf_list.append(ac_surf)
 		
 	def parse_vertices(self):
@@ -391,10 +391,7 @@ class AcObj:
 			self.ac_mats[mat_index] = ac_mats.index(ac_mat)
 			mat_index = mat_index + 1
 	
-	def parse_blender_textures(self):
-		
-		pass
-		
+	
 class ExportConf:
 	def __init__(
 			self,
@@ -408,7 +405,6 @@ class ExportConf:
 			global_coords,
 			mircol_as_emis,
 			mircol_as_amb,
-			no_split,
 			export_lamps,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
@@ -416,6 +412,7 @@ class ExportConf:
 		self.context = context
 		self.global_matrix = global_matrix
 		self.use_selection = use_selection
+		self.use_render_layers = use_render_layers
 		self.skip_data = skip_data
 		self.global_coords = global_coords
 		self.mircol_as_emis = mircol_as_emis
@@ -440,7 +437,6 @@ class ExportAC3D:
 			global_coords=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
-			no_split=True,
 			export_lamps=False,
 			):
 
@@ -455,7 +451,6 @@ class ExportAC3D:
 										global_coords,
 										mircol_as_emis,
 										mircol_as_amb,
-										no_split,
 										export_lamps,
 										)
 
