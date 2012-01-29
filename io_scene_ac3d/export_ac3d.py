@@ -41,6 +41,7 @@ import struct
 import bpy
 import mathutils
 from math import radians
+from mathutils import Vector, Euler, Matrix
 from bpy import *
 
 DEBUG = True
@@ -48,6 +49,8 @@ DEBUG = True
 def TRACE(message):
 	if DEBUG:
 		print(message)
+
+###########################
 
 class AcMat:
 	'''
@@ -140,6 +143,7 @@ class AcSurf:
 			bl_face,
 			bl_mats,
 			is_two_sided,
+			is_flipped,
 			uv_tex_face,
 			ac_obj,
 			):
@@ -150,6 +154,7 @@ class AcSurf:
 		self.bl_mats = bl_mats	# Sometimes a face/surface has no material to it .. so the material index is null...
 		self.uv_face = uv_tex_face
 		self.is_two_sided = is_two_sided
+		self.is_flipped = is_flipped
 		self.ac_surf_flags = self.AcSurfFlags(0, False, True)
 
 		self.parse_blender_face(bl_face, ac_obj)
@@ -159,7 +164,11 @@ class AcSurf:
 		ac_file.write('SURF {0:#X}\n'.format(surf_flags))
 		ac_file.write('mat {0}\n'.format(self.mat))
 		ac_file.write('refs {0}\n'.format(len(self.refs)))
-		for n in range(len(self.refs)):
+		r = range(len(self.refs))
+		if self.is_flipped:
+			r = reversed(r)
+
+		for n in r:
 			surf_ref = self.refs[n]
 			uv_ref = self.uv_refs[n]
 			ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
@@ -201,6 +210,7 @@ class AcObj:
 			):
 		self.ac_mats = {}
 		self.name = ''
+		self.mesh = None
 		self.export_config = export_config
 		self.bl_obj = bl_obj
 		self.bl_export_flag = False
@@ -210,14 +220,39 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		if bl_obj:
-			self.location = export_config.global_matrix * bl_obj.location
-			rotation = bl_obj.rotation_euler.to_matrix()
-			#TRACE("Object: {0}".format(rotation))
+			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
+
+			rotation = bl_obj.rotation_euler.to_quaternion()
+			rotation.axis = export_config.global_matrix * rotation.axis
 			
-			self.rotation = rotation
+			#global_matrix_abs = Matrix((
+			#  [abs(a) for a in export_config.global_matrix[0]],
+			#  [abs(a) for a in export_config.global_matrix[1]],
+			#  [abs(a) for a in export_config.global_matrix[2]]
+			#))
+			
+			#rotation = Euler(export_config.global_matrix * Vector(bl_obj.rotation_euler[:]))
+
+			print(bl_obj.name, bl_obj.scale)			
+			print('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
+
+			self.rotation = rotation.to_matrix()
+
+			matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
+			
+			print('scale={0}'.format(matrix_scale))
+			
+			self.vertex_transform = export_config.global_matrix * matrix_scale.to_4x4()
+			
+			self.is_flipped = bl_obj.scale[0] * bl_obj.scale[1] * bl_obj.scale[2] < 0
+			
+			print('vt={0}'.format(self.vertex_transform))
+
+			#TRACE("Object: {0}".format(rotation))
 		else:
 			self.location = None		# translation location of the center relative to the parent object
 			self.rotation = None		# 3x3 rotational matrix for vertices
+			self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
 		self.url = ''				# url of the object (??!)
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []			# list of Vector(X,Y,Z) objects
@@ -264,8 +299,9 @@ class AcObj:
 
 	def parse_blender_object(self, ac_mats, str_pre):
 		sSubType = ''
-		if self.bl_obj != None:		
+		if self.bl_obj != None:
 			self.name = self.bl_obj.name
+			self.mesh = self.bl_obj.data
 			if self.bl_obj.type == 'LAMP':
 				self.type = 'lamp'
 				self.bl_export_flag = self.export_config.export_lamps
@@ -276,6 +312,8 @@ class AcObj:
 					sSubType = 'Polyline'
 				elif self.bl_obj.type == 'SURFACE':
 					sSubType = 'closedPolyline'
+				elif self.bl_obj.type == 'MESH':
+					self.mesh = self.bl_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
 			elif self.bl_obj.type == 'EMPTY':
 				self.type = 'group'
 				self.bl_export_flag = True
@@ -286,8 +324,8 @@ class AcObj:
 				if self.type == 'poly':
 					self.parse_blender_mesh(ac_mats, str_pre)
 
-				if self.type == 'group':
-					self.parse_sub_objects(ac_mats, str_pre)
+#				if self.type == 'group': -> Objects also can have children
+				self.parse_sub_objects(ac_mats, str_pre)
 
 				if self.type == 'lamp':
 					self.parse_lamp()
@@ -328,21 +366,21 @@ class AcObj:
 
 		uv_tex = None
 
-		if len(self.bl_obj.data.uv_textures):
-			uv_tex = self.bl_obj.data.uv_textures[0]
+		if len(self.mesh.uv_textures):
+			uv_tex = self.mesh.uv_textures[0]
 
-		for face_idx in range(len(self.bl_obj.data.faces)):
-			bl_face = self.bl_obj.data.faces[face_idx]
+		for face_idx in range(len(self.mesh.faces)):
+			bl_face = self.mesh.faces[face_idx]
 			tex_face = None
 			if uv_tex:
 				tex_face = uv_tex.data[face_idx]
 
-			ac_surf = AcSurf(self.export_conf, bl_face, self.bl_obj.data.materials, bl_two_sided, tex_face, self)
+			ac_surf = AcSurf(self.export_conf, bl_face, self.bl_obj.data.materials, bl_two_sided, self.is_flipped, tex_face, self)
 			self.surf_list.append(ac_surf)
 		
 	def parse_vertices(self):
-		for vtex in self.bl_obj.data.vertices:
-			self.vert_list.append((self.export_conf.global_matrix * vtex.co))
+		for vtex in self.mesh.vertices:
+			self.vert_list.append((self.vertex_transform * vtex.co))
 		
 	def parse_blender_materials(self, material_slots, ac_mats):
 		mat_index = 0
