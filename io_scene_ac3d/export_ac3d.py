@@ -27,9 +27,10 @@ Some noted points that are important for consideration:
  - AC3D supports only one texture per surface. This is a UV texture map, so only blenders texmap is exported
  - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender. The export uses a comparison of material properties to see if a material is the same as another one and then uses that material index for the .ac file.
 
+TODO: Option to only export what's currently in the scene
+TODO: Option to define "DefaultWhite" material
 TODO: Add ability to only export selected items
-TODO: Export textures to .ac location
-
+TODO: Optionally over-write existing textures
 '''
 
 
@@ -137,6 +138,7 @@ class AcSurf:
 			self,
 			export_config,
 			bl_face,
+			bl_mats,
 			is_two_sided,
 			uv_tex_face,
 			ac_obj,
@@ -145,6 +147,7 @@ class AcSurf:
 		self.mat = 0		# material index for this surface
 		self.refs = []		# list of vertex references from the parent mesh
 		self.uv_refs = []	# list of UV referense for texture mapping
+		self.bl_mats = bl_mats	# Sometimes a face/surface has no material to it .. so the material index is null...
 		self.uv_face = uv_tex_face
 		self.is_two_sided = is_two_sided
 		self.ac_surf_flags = self.AcSurfFlags(0, False, True)
@@ -183,7 +186,10 @@ class AcSurf:
 			else:
 				self.uv_refs.append([0,0])
 
-		self.mat = ac_obj.ac_mats[bl_face.material_index]
+		# TRACE('Material index {0}'.format(bl_face.material_index))
+		if len(self.bl_mats) > 0:
+			self.mat = ac_obj.ac_mats[bl_face.material_index]
+	
 		self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
 		self.ac_surf_flags.twosided = self.is_two_sided
 		
@@ -256,7 +262,7 @@ class AcObj:
 		for kid in self.children:
 			kid.write_ac_output(ac_file)
 
-	def parse_blender_object(self, ac_mats):
+	def parse_blender_object(self, ac_mats, str_pre):
 		sSubType = ''
 		if self.bl_obj != None:		
 			self.name = self.bl_obj.name
@@ -274,12 +280,14 @@ class AcObj:
 				self.type = 'group'
 				self.bl_export_flag = True
 
+			# Add any children
+
 			if self.bl_export_flag:
 				if self.type == 'poly':
-					self.parse_blender_mesh(ac_mats)
+					self.parse_blender_mesh(ac_mats, str_pre)
 
 				if self.type == 'group':
-					self.parse_sub_objects(ac_mats)
+					self.parse_sub_objects(ac_mats, str_pre)
 
 				if self.type == 'lamp':
 					self.parse_lamp()
@@ -288,29 +296,35 @@ class AcObj:
 		# Create Lamp information - I don't think AC3D does lamps...
 		self.bl_export_flag = False
 
-	def parse_sub_objects(self, ac_mats):
+	def parse_sub_objects(self, ac_mats, str_pre):
 		# Read the child objects and those who's parents are this object, we make child objects
 		if self.export_conf.use_selection:
 			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj and _obj.select == True]
 		else:
 			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]
+		
+		bpy.data.scenes
+# TODO: Option to only export from active layer
+		TRACE("{0}+-{1}".format(str_pre, self.name))
+		str_pre = str_pre + " "
 
 		for bl_obj in bl_obj_list:
 			ac_obj = AcObj(self.export_conf, bl_obj)
-			ac_obj.parse_blender_object(ac_mats)
+			ac_obj.parse_blender_object(ac_mats, str_pre)
 			if ac_obj.bl_export_flag:
 				self.children.append(ac_obj)
 		
 		del bl_obj_list
 
-	def parse_blender_mesh(self, ac_mats):
+	def parse_blender_mesh(self, ac_mats, str_pre):
 		# Export materials out first
 		self.data = self.bl_obj.data.name
+		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
 		self.parse_blender_materials(self.bl_obj.material_slots, ac_mats)
 		self.parse_vertices()
-		self.parse_faces(self.bl_obj.data.show_double_sided)
+		self.parse_faces(self.bl_obj.data.show_double_sided, self.bl_obj.data.materials)
 
-	def parse_faces(self, bl_two_sided):
+	def parse_faces(self, bl_two_sided, bl_mat_slots):
 
 		uv_tex = None
 
@@ -323,7 +337,7 @@ class AcObj:
 			if uv_tex:
 				tex_face = uv_tex.data[face_idx]
 
-			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, tex_face, self)
+			ac_surf = AcSurf(self.export_conf, bl_face, bl_mat_slots, bl_two_sided, tex_face, self)
 			self.surf_list.append(ac_surf)
 		
 	def parse_vertices(self):
@@ -348,8 +362,9 @@ class AcObj:
 				ac_mats.append(ac_mat)
 
 			# Check to see if there's a texture...
-			if bl_mat.use_face_texture and self.tex_name=='':
+			if self.tex_name=='':
 				# export it
+				
 				for tex_slot in bl_mat.texture_slots:
 					if tex_slot and tex_slot.texture_coords == 'UV':
 						bl_tex = tex_slot.texture
@@ -358,6 +373,7 @@ class AcObj:
 						tex_name=tex_path[1]
 						export_tex = os.path.join(self.export_conf.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
+# TODO: Optionally over-write existing textures
 						if not os.path.exists(export_tex):
 							if bl_im.packed_file:
 								bl_im.file_format = 'PNG'
@@ -369,9 +385,9 @@ class AcObj:
 							# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
 						
 						self.tex_name = tex_name
-						self.texrep = [1,1]
 
 			# Blender to AC3d index cross-reference
+			# TRACE('Created Material {0} at index {1}'.format(ac_mats.index(ac_mat), mat_index))
 			self.ac_mats[mat_index] = ac_mats.index(ac_mat)
 			mat_index = mat_index + 1
 	
@@ -387,6 +403,7 @@ class ExportConf:
 			filepath,
 			global_matrix,
 			use_selection,
+			use_render_layers,
 			skip_data,
 			global_coords,
 			mircol_as_emis,
@@ -418,6 +435,7 @@ class ExportAC3D:
 			filepath='',
 			global_matrix=None,
 			use_selection=False,
+			use_render_layers=True,
 			skip_data=False,
 			global_coords=False,
 			mircol_as_emis=True,
@@ -432,6 +450,7 @@ class ExportAC3D:
 										filepath,
 										global_matrix,
 										use_selection,
+										use_render_layers,
 										skip_data,
 										global_coords,
 										mircol_as_emis,
@@ -447,7 +466,7 @@ class ExportAC3D:
 
 			self.ac_world = AcObj(self.export_conf, None)
 
-			self.ac_world.parse_sub_objects(self.ac_mats)
+			self.ac_world.parse_sub_objects(self.ac_mats, "")
 
 			# dump the contents of the lists to file
 			ac_file = open(filepath, 'w')

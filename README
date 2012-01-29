@@ -20,7 +20,7 @@ Go to File->Import->AC3D (.ac), select a file and let it do the work
 
 Known Issues:
 
-	- Export doesn't export the UV references for texture mapping
+	- The export script includes code to export packed .blend images. This is untested...
 
 Acknowledgments:
 
