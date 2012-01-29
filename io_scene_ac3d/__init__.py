@@ -213,7 +213,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 	use_selection = BoolProperty(
 							name="Selection Only",
 							description="Export selected objects only",
-							default=False,
+							default=True,
 							)
 	skip_data = BoolProperty(
 							name="Skip Data",
