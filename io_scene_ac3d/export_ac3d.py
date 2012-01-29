@@ -141,6 +141,7 @@ class AcSurf:
 			export_config,
 			bl_face,
 			is_two_sided,
+			is_flipped,
 			uv_tex_face,
 			ac_obj,
 			):
@@ -150,6 +151,7 @@ class AcSurf:
 		self.uv_refs = []	# list of UV referense for texture mapping
 		self.uv_face = uv_tex_face
 		self.is_two_sided = is_two_sided
+		self.is_flipped = is_flipped
 		self.ac_surf_flags = self.AcSurfFlags(0, False, True)
 
 		self.parse_blender_face(bl_face, ac_obj)
@@ -159,7 +161,11 @@ class AcSurf:
 		ac_file.write('SURF {0:#X}\n'.format(surf_flags))
 		ac_file.write('mat {0}\n'.format(self.mat))
 		ac_file.write('refs {0}\n'.format(len(self.refs)))
-		for n in range(len(self.refs)):
+		r = range(len(self.refs))
+		if self.is_flipped:
+			r = reversed(r)
+
+		for n in r:
 			surf_ref = self.refs[n]
 			uv_ref = self.uv_refs[n]
 			ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
@@ -211,26 +217,38 @@ class AcObj:
 		if bl_obj:
 			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
 
-			#matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
-			global_matrix_abs = Matrix(([abs(a) for a in export_config.global_matrix[0]], [abs(a) for a in export_config.global_matrix[1]], [abs(a) for a in export_config.global_matrix[2]]))
-			scale = global_matrix_abs * bl_obj.scale
-			matrix_scale = Matrix([[scale[0], 0, 0], [0, scale[1], 0], [0, 0, scale[2]]])
-			print('scale={0}'.format(matrix_scale))
-
-			rotation = bl_obj.matrix_local.to_quaternion()
+			rotation = bl_obj.rotation_euler.to_quaternion()
 			rotation.axis = export_config.global_matrix * rotation.axis
-			rotation.angle *= -1
+			#rotation.angle *= -1
 			
-			rotation = Euler(export_config.global_matrix * Vector(bl_obj.matrix_local.to_euler()[:]))
+			#global_matrix_abs = Matrix((
+			#  [abs(a) for a in export_config.global_matrix[0]],
+			#  [abs(a) for a in export_config.global_matrix[1]],
+			#  [abs(a) for a in export_config.global_matrix[2]]
+			#))
 			
+			#rotation = Euler(export_config.global_matrix * Vector(bl_obj.rotation_euler[:]))
+
+			print(bl_obj.name, bl_obj.scale)			
 			print('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
 
-			self.rotation = matrix_scale * rotation.to_matrix()
+			self.rotation = rotation.to_matrix()
+
+			matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
+			
+			print('scale={0}'.format(matrix_scale))
+			
+			self.vertex_transform = export_config.global_matrix * matrix_scale.to_4x4()
+			
+			self.is_flipped = bl_obj.scale[0] * bl_obj.scale[1] * bl_obj.scale[2] < 0
+			
+			print('vt={0}'.format(self.vertex_transform))
 
 			#TRACE("Object: {0}".format(rotation))
 		else:
 			self.location = None		# translation location of the center relative to the parent object
 			self.rotation = None		# 3x3 rotational matrix for vertices
+			self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
 		self.url = ''				# url of the object (??!)
 		self.crease = 30			# crease angle for smoothing
 		self.vert_list = []			# list of Vector(X,Y,Z) objects
@@ -345,12 +363,12 @@ class AcObj:
 			if uv_tex:
 				tex_face = uv_tex.data[face_idx]
 
-			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, tex_face, self)
+			ac_surf = AcSurf(self.export_conf, bl_face, bl_two_sided, self.is_flipped, tex_face, self)
 			self.surf_list.append(ac_surf)
 		
 	def parse_vertices(self):
 		for vtex in self.mesh.vertices:
-			self.vert_list.append((self.export_conf.global_matrix * vtex.co))
+			self.vert_list.append((self.vertex_transform * vtex.co))
 		
 	def parse_blender_materials(self, material_slots, ac_mats):
 		mat_index = 0
