@@ -33,8 +33,12 @@ TODO: Optionally over-write existing textures
 
 
 import os
+import sys
 import shutil
 import struct
+from collections import deque
+
+from . import AC3D
 
 import bpy
 import mathutils
@@ -200,11 +204,18 @@ class AcSurf:
 		self.ac_surf_flags.twosided = self.is_two_sided
 		
 class AcObj:
-	def __init__(
-			self,
-			export_config,
-			bl_obj,
-			):
+	def __init__(	self,
+								export_config,
+								bl_obj,
+								bl_children = [] ):
+		'''
+		Create a AC3D object from a blender object and it's children
+		
+		@param bl_obj	The blender object (If None than this object will be of type
+		              world)
+		@param bl_children	Blender objects which should become children of this
+		                    object TODO use them
+		'''
 		self.ac_mats = {}
 		self.name = ''
 		self.mesh = None
@@ -216,6 +227,7 @@ class AcObj:
 		self.data = ''				# custom data (mesh name)
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
+
 		if bl_obj:
 			# absolute position in world coordinates
 			pos_abs = bl_obj.matrix_world.to_translation()
@@ -247,8 +259,8 @@ class AcObj:
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
 		self.edge_list = []			# spare edge list (handles poly lines etc)
-		self.children = []			# child objects
-	
+		self.children =  []			# child objects
+
 		self.export_conf = export_config
 
 	def write_ac_output(self, ac_file):
@@ -282,43 +294,41 @@ class AcObj:
 			kid.write_ac_output(ac_file)
 
 	def parse_blender_object(self, ac_mats, str_pre):
-		sSubType = ''
-		if self.bl_obj != None:
-			self.name = self.bl_obj.name
-			self.mesh = self.bl_obj.data
-			if self.bl_obj.type == 'LAMP':
-				self.type = 'lamp'
-				self.bl_export_flag = self.export_config.export_lamps
-			elif self.bl_obj.type in ['MESH', 'LATTICE', 'CURVE', 'SURFACE']:
-				self.type = 'poly'
-				self.bl_export_flag = True
-				if self.bl_obj.type == 'CURVE':
-					sSubType = 'Polyline'
-				elif self.bl_obj.type == 'SURFACE':
-					sSubType = 'closedPolyline'
-				elif self.bl_obj.type == 'MESH':
-					self.mesh = self.bl_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
-			elif self.bl_obj.type == 'EMPTY':
-				self.type = 'group'
-				self.bl_export_flag = True
 
-			if self.bl_export_flag:
-				if self.type == 'poly':
-					self.parse_blender_mesh(ac_mats, str_pre)
+		if self.bl_obj == None:
+			# World
+			return
 
-				if self.type == 'lamp':
-					self.parse_lamp()
+		self.name = self.bl_obj.name
+		self.mesh = self.bl_obj.data
+		
+		TRACE(self.bl_obj.type)
+
+		if self.bl_obj.type in ['MESH', 'LATTICE', 'SURFACE']: # TODO 'CURVE' doesn't support auto_smooth
+			self.type = 'poly'
+			self.bl_export_flag = True
+
+			if self.bl_obj.type == 'MESH':
+				self.mesh = self.bl_obj.to_mesh(bpy.context.scene, True, 'PREVIEW')
+		elif self.bl_obj.type == 'EMPTY':
+			self.type = 'group'
+			self.bl_export_flag = True
+
+		if self.bl_export_flag:
+			if self.type == 'poly':
+				self.parse_blender_mesh(ac_mats, str_pre)
 
 				if self.bl_obj.type == 'MESH':
 					# remove temporal mesh
 					bpy.data.meshes.remove(self.mesh)
+					
+			elif self.type == 'group':
+				TRACE('GROUP')
+				if self.bl_obj.dupli_type == 'GROUP':
+					TRACE(self.bl_obj.dupli_group.objects)
 
 			# Every object may have children...
 			self.parse_sub_objects(ac_mats, str_pre)
-
-	def parse_lamp(self):
-		# Create Lamp information - I don't think AC3D does lamps...
-		self.bl_export_flag = False
 
 	def parse_sub_objects(self, ac_mats, str_pre):
 		# Read the child objects and those who's parents are this object, we make child objects
@@ -331,7 +341,7 @@ class AcObj:
 			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj and _obj.select == True]
 		else:
 			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj]
-		
+		TRACE([ob for ob in bl_obj_list])
 		TRACE("{0}+-{1}".format(str_pre, self.name))
 		str_pre = str_pre + " "
 
@@ -447,7 +457,6 @@ class ExportConf:
 			global_coords,
 			mircol_as_emis,
 			mircol_as_amb,
-			export_lamps,
 			crease_angle,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
@@ -460,7 +469,6 @@ class ExportConf:
 		self.global_coords = global_coords
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
-		self.export_lamps = export_lamps
 		self.crease_angle = crease_angle
 
 		# used to determine relative file paths
@@ -481,7 +489,6 @@ class ExportAC3D:
 			global_coords=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
-			export_lamps=False,
 			crease_angle=radians(179.0),
 			):
 
@@ -496,17 +503,22 @@ class ExportAC3D:
 										global_coords,
 										mircol_as_emis,
 										mircol_as_amb,
-										export_lamps,
 										crease_angle,
 										)
 
 			#TRACE("Global: {0}".format(global_matrix))
-
+			
 			self.ac_mats = []
 			self.ac_world = None
 
-			self.ac_world = AcObj(self.export_conf, None)
+			# Parsing the tree in a top down manner and check on the way down which
+			# objects are to be exported
+			
+			self.world = AC3D.World('Blender_export__' + bpy.path.basename(filepath), self.export_conf)
+			self.parseLevel(self.world, [ob for ob in bpy.data.objects if ob.parent == None and not ob.library])
 
+			# TODO remove
+			self.ac_world = AcObj(self.export_conf, None)
 			self.ac_world.parse_sub_objects(self.ac_mats, "")
 
 			# dump the contents of the lists to file
@@ -515,6 +527,39 @@ class ExportAC3D:
 			for ac_mat in self.ac_mats:
 				ac_mat.write_ac_material(ac_file)
 
-			self.ac_world.write_ac_output(ac_file)
-
+			#self.ac_world.write_ac_output(ac_file)
+			self.world.write(ac_file)
 			ac_file.close()
+
+	def parseLevel(self, parent, objects):
+		'''
+		Parse a level in the object hierarchy
+		'''
+		for ob in objects:
+
+			ac_ob = None
+			children = [child for child in ob.children]
+			
+			if 		(not self.export_conf.use_render_layers or ob.is_visible(self.export_conf.context.scene))\
+				and (not self.export_conf.use_selection or ob.select):
+
+				if ob.type in ['MESH', 'LATTICE', 'SURFACE']: # TODO CURVE
+					ac_ob = AC3D.Poly(ob.name, ob, self.export_conf)
+				elif ob.type == 'EMPTY':
+					ac_ob = AC3D.Group(ob.name, ob, self.export_conf)
+					
+					if ob.dupli_type == 'GROUP':
+						children.extend(ob.dupli_group.objects)
+				else:
+					print('Skipping object {0} (type={1})'.format(ob.name, ob.type))
+					
+			if ac_ob:
+				parent.addChild(ac_ob)
+				next_parent = ac_ob
+			else:
+				# if link chain is broken (aka one element not exported) the object will
+				# be placed in global space (=world)
+				next_parent = self.world
+
+			if len(children):
+				self.parseLevel(next_parent, children)
