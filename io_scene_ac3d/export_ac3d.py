@@ -195,7 +195,6 @@ class AcSurf:
 			else:
 				self.uv_refs.append([0,0])
 
-		# TRACE('Material index {0}'.format(bl_face.material_index))
 		if len(self.bl_mats) > 0:
 			self.mat = ac_obj.ac_mats[bl_face.material_index]
 	
@@ -220,6 +219,8 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		if bl_obj:
+			self.location = export_config.global_matrix * bl_obj.location
+			rotation = bl_obj.rotation_euler.to_matrix()
 			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
 
 			rotation = bl_obj.rotation_euler.to_quaternion()
@@ -233,28 +234,27 @@ class AcObj:
 			
 			#rotation = Euler(export_config.global_matrix * Vector(bl_obj.rotation_euler[:]))
 
-			print(bl_obj.name, bl_obj.scale)			
-			print('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
+			TRACE('{0} {1}'.format(bl_obj.name, bl_obj.scale))
+			TRACE('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
 
 			self.rotation = rotation.to_matrix()
 
 			matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
 			
-			print('scale={0}'.format(matrix_scale))
+			TRACE('scale={0}'.format(matrix_scale))
 			
 			self.vertex_transform = export_config.global_matrix * matrix_scale.to_4x4()
 			
 			self.is_flipped = bl_obj.scale[0] * bl_obj.scale[1] * bl_obj.scale[2] < 0
 			
-			print('vt={0}'.format(self.vertex_transform))
+			TRACE('vt={0}'.format(self.vertex_transform))
 
-			#TRACE("Object: {0}".format(rotation))
 		else:
 			self.location = None		# translation location of the center relative to the parent object
 			self.rotation = None		# 3x3 rotational matrix for vertices
 			self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
 		self.url = ''				# url of the object (??!)
-		self.crease = 30			# crease angle for smoothing
+		self.crease = None			# crease angle for smoothing - modified to bring it closer to defaults requested on blender forum
 		self.vert_list = []			# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
@@ -324,11 +324,11 @@ class AcObj:
 				if self.type == 'poly':
 					self.parse_blender_mesh(ac_mats, str_pre)
 
-#				if self.type == 'group': -> Objects also can have children
-				self.parse_sub_objects(ac_mats, str_pre)
-
 				if self.type == 'lamp':
 					self.parse_lamp()
+
+				# May have children...
+				self.parse_sub_objects(ac_mats, str_pre)
 
 	def parse_lamp(self):
 		# Create Lamp information - I don't think AC3D does lamps...
@@ -356,11 +356,24 @@ class AcObj:
 
 	def parse_blender_mesh(self, ac_mats, str_pre):
 		# Export materials out first
-		self.data = self.bl_obj.data.name
+		if self.export_conf.skip_data==False:
+			self.data = self.bl_obj.data.name
+
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
-		self.parse_blender_materials(self.bl_obj.material_slots, ac_mats)
+
+		if len(self.bl_obj.modifiers)>0:
+			for mod in self.bl_obj.modifiers:
+				if mod.type='EDGE_SPLIT':
+					self.crease=degrees(mod.split_angle)
+		if not self.crease:
+			if self.bl_obj.data.use_auto_smooth:
+				self.crease = degrees(self.bl_obj.data.auto_smooth_angle)
+			else:
+				self.crease=179
+
+		self.parse_blender_materials(self.mesh.materials, ac_mats)
 		self.parse_vertices()
-		self.parse_faces(self.bl_obj.data.show_double_sided)
+		self.parse_faces(self.mesh.show_double_sided)
 
 	def parse_faces(self, bl_two_sided):
 
@@ -382,11 +395,10 @@ class AcObj:
 		for vtex in self.mesh.vertices:
 			self.vert_list.append((self.vertex_transform * vtex.co))
 		
-	def parse_blender_materials(self, material_slots, ac_mats):
+	def parse_blender_materials(self, bl_materials, ac_mats):
 		mat_index = 0
-		for bl_mat_sl in material_slots:
+		for bl_mat in bl_materials:
 			ac_mat = AcMat(self.export_conf)
-			bl_mat = bl_mat_sl.material
 			ac_mat.from_blender_mat(bl_mat)
 
 			bUniqueMaterial = True
