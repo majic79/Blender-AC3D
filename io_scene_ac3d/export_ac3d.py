@@ -217,39 +217,29 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		if bl_obj:
-			self.location = export_config.global_matrix * bl_obj.location
-			rotation = bl_obj.rotation_euler.to_matrix()
-			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
+			# absolute position in world coordinates
+			pos_abs = bl_obj.matrix_world.to_translation()
 
-			rotation = bl_obj.rotation_euler.to_quaternion()
-			rotation.axis = export_config.global_matrix * rotation.axis
-			
-			#global_matrix_abs = Matrix((
-			#  [abs(a) for a in export_config.global_matrix[0]],
-			#  [abs(a) for a in export_config.global_matrix[1]],
-			#  [abs(a) for a in export_config.global_matrix[2]]
-			#))
-			
-			#rotation = Euler(export_config.global_matrix * Vector(bl_obj.rotation_euler[:]))
+			if bl_obj.parent != None:
+				# position relative to parent
+				pos_rel = pos_abs - bl_obj.parent.matrix_world.to_translation()
+			else:
+				pos_rel = pos_abs
 
-			TRACE('{0} {1}'.format(bl_obj.name, bl_obj.scale))
-			TRACE('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
-
-			self.rotation = rotation.to_matrix()
-
-			matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
+			# apply all transformations but translation
+			vertex_transform = Matrix.Translation(-pos_abs) * bl_obj.matrix_world
 			
-			TRACE('scale={0}'.format(matrix_scale))
-			
-			self.vertex_transform = export_config.global_matrix * matrix_scale.to_4x4()
-			
+			# detect if normals should be flipped
 			self.is_flipped = bl_obj.scale[0] * bl_obj.scale[1] * bl_obj.scale[2] < 0
 			
-			TRACE('vt={0}'.format(self.vertex_transform))
-
+			# apply additional export transformation
+			self.location = export_config.global_matrix * pos_rel
+			self.vertex_transform = export_config.global_matrix * vertex_transform
+			
+			#TRACE('pos={0}'.format(self.location))
+			#TRACE('vt={0}'.format(self.vertex_transform))
 		else:
 			self.location = None		# translation location of the center relative to the parent object
-			self.rotation = None		# 3x3 rotational matrix for vertices
 			self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
 		self.url = ''				# url of the object (??!)
 		self.crease = None			# crease angle for smoothing - modified to bring it closer to defaults requested on blender forum
@@ -276,10 +266,6 @@ class AcObj:
 
 		if self.location:
 			ac_file.write('loc {0} {1} {2}\n'.format(self.location[0],self.location[1],self.location[2]))
-
-		if self.rotation:
-			rot = self.rotation
-			ac_file.write('rot {0} {1} {2}  {3} {4} {5}  {6} {7} {8}\n'.format(rot[0][0],rot[0][1],rot[0][2],rot[1][0],rot[1][1],rot[1][2],rot[2][0],rot[2][1],rot[2][2]))
 
 		if len(self.vert_list) > 0:
 			ac_file.write('numvert {0}\n'.format(len(self.vert_list)))
@@ -316,8 +302,6 @@ class AcObj:
 				self.type = 'group'
 				self.bl_export_flag = True
 
-			# Add any children
-
 			if self.bl_export_flag:
 				if self.type == 'poly':
 					self.parse_blender_mesh(ac_mats, str_pre)
@@ -325,8 +309,12 @@ class AcObj:
 				if self.type == 'lamp':
 					self.parse_lamp()
 
-				# May have children...
-				self.parse_sub_objects(ac_mats, str_pre)
+				if self.bl_obj.type == 'MESH':
+					# remove temporal mesh
+					bpy.data.meshes.remove(self.mesh)
+
+			# Every object may have children...
+			self.parse_sub_objects(ac_mats, str_pre)
 
 	def parse_lamp(self):
 		# Create Lamp information - I don't think AC3D does lamps...
@@ -344,8 +332,6 @@ class AcObj:
 		else:
 			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj]
 		
-		bpy.data.scenes
-
 		TRACE("{0}+-{1}".format(str_pre, self.name))
 		str_pre = str_pre + " "
 
