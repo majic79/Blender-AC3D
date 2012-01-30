@@ -213,7 +213,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 	use_selection = BoolProperty(
 							name="Selection Only",
 							description="Export selected objects only",
-							default=True,
+							default=False,
 							)
 	skip_data = BoolProperty(
 							name="Skip Data",
@@ -239,6 +239,14 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							name="Export Lamps",
 							description="Export lamps into AC3D file",
 							default=False,
+							)
+	crease_angle = FloatProperty(
+							name="Default Crease Angle",
+							description="Default crease angle for exported .ac faces",
+							default=radians(179.0),
+							options={"ANIMATABLE"},
+							unit="ROTATION",
+							subtype="ANGLE",
 							)
 # This behaviour from the original exporter - not applicable?
 #	no_split = BoolProperty(

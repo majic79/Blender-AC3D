@@ -27,9 +27,7 @@ Some noted points that are important for consideration:
  - AC3D supports only one texture per surface. This is a UV texture map, so only blenders texmap is exported
  - Blender's Materials can have multiple textures per material - so a material + texure in AC3D requires a distinct and unique material in blender. The export uses a comparison of material properties to see if a material is the same as another one and then uses that material index for the .ac file.
 
-TODO: Option to only export what's currently in the scene
 TODO: Option to define "DefaultWhite" material
-TODO: Add ability to only export selected items
 TODO: Optionally over-write existing textures
 '''
 
@@ -40,7 +38,7 @@ import struct
 
 import bpy
 import mathutils
-from math import radians
+from math import radians, degrees
 from mathutils import Vector, Euler, Matrix
 from bpy import *
 
@@ -336,13 +334,18 @@ class AcObj:
 
 	def parse_sub_objects(self, ac_mats, str_pre):
 		# Read the child objects and those who's parents are this object, we make child objects
-		if self.export_conf.use_selection:
-			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj and _obj.select == True]
+		if self.export_conf.use_render_layers:
+			obj_list = [_o for _o in self.export_conf.context.visible_objects]
 		else:
-			bl_obj_list = [_obj for _obj in bpy.data.objects if _obj.parent == self.bl_obj]
+			obj_list = [_o for _o in bpy.data.objects]
+
+		if self.export_conf.use_selection:
+			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj and _obj.select == True]
+		else:
+			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj]
 		
 		bpy.data.scenes
-# TODO: Option to only export from active layer
+
 		TRACE("{0}+-{1}".format(str_pre, self.name))
 		str_pre = str_pre + " "
 
@@ -353,6 +356,7 @@ class AcObj:
 				self.children.append(ac_obj)
 		
 		del bl_obj_list
+		del obj_list
 
 	def parse_blender_mesh(self, ac_mats, str_pre):
 		# Export materials out first
@@ -363,13 +367,13 @@ class AcObj:
 
 		if len(self.bl_obj.modifiers)>0:
 			for mod in self.bl_obj.modifiers:
-				if mod.type='EDGE_SPLIT':
+				if mod.type=='EDGE_SPLIT':
 					self.crease=degrees(mod.split_angle)
 		if not self.crease:
 			if self.bl_obj.data.use_auto_smooth:
 				self.crease = degrees(self.bl_obj.data.auto_smooth_angle)
 			else:
-				self.crease=179
+				self.crease=self.export_conf.crease_angle
 
 		self.parse_blender_materials(self.mesh.materials, ac_mats)
 		self.parse_vertices()
@@ -456,6 +460,7 @@ class ExportConf:
 			mircol_as_emis,
 			mircol_as_amb,
 			export_lamps,
+			crease_angle,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
@@ -468,6 +473,7 @@ class ExportConf:
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
 		self.export_lamps = export_lamps
+		self.crease_angle = crease_angle
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -488,6 +494,7 @@ class ExportAC3D:
 			mircol_as_emis=True,
 			mircol_as_amb=False,
 			export_lamps=False,
+			crease_angle=radians(179.0),
 			):
 
 			self.export_conf = ExportConf(
@@ -502,6 +509,7 @@ class ExportAC3D:
 										mircol_as_emis,
 										mircol_as_amb,
 										export_lamps,
+										crease_angle,
 										)
 
 			#TRACE("Global: {0}".format(global_matrix))
