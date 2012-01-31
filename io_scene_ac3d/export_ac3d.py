@@ -302,7 +302,7 @@ class AcObj:
 		self.name = self.bl_obj.name
 		self.mesh = self.bl_obj.data
 		
-		TRACE(self.bl_obj.type)
+		#TRACE(self.bl_obj.type)
 
 		if self.bl_obj.type in ['MESH', 'LATTICE', 'SURFACE']: # TODO 'CURVE' doesn't support auto_smooth
 			self.type = 'poly'
@@ -323,9 +323,10 @@ class AcObj:
 					bpy.data.meshes.remove(self.mesh)
 					
 			elif self.type == 'group':
-				TRACE('GROUP')
+				#TRACE('GROUP')
 				if self.bl_obj.dupli_type == 'GROUP':
-					TRACE(self.bl_obj.dupli_group.objects)
+					#TRACE(self.bl_obj.dupli_group.objects)
+					pass
 
 			# Every object may have children...
 			self.parse_sub_objects(ac_mats, str_pre)
@@ -341,7 +342,7 @@ class AcObj:
 			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj and _obj.select == True]
 		else:
 			bl_obj_list = [_obj for _obj in obj_list if _obj.parent == self.bl_obj]
-		TRACE([ob for ob in bl_obj_list])
+		#TRACE([ob for ob in bl_obj_list])
 		TRACE("{0}+-{1}".format(str_pre, self.name))
 		str_pre = str_pre + " "
 
@@ -516,10 +517,11 @@ class ExportAC3D:
 			
 			self.world = AC3D.World('Blender_export__' + bpy.path.basename(filepath), self.export_conf)
 			self.parseLevel(self.world, [ob for ob in bpy.data.objects if ob.parent == None and not ob.library])
+			self.world.parse(self.ac_mats)
 
 			# TODO remove
-			self.ac_world = AcObj(self.export_conf, None)
-			self.ac_world.parse_sub_objects(self.ac_mats, "")
+			#self.ac_world = AcObj(self.export_conf, None)
+			#self.ac_world.parse_sub_objects(self.ac_mats, "")
 
 			# dump the contents of the lists to file
 			ac_file = open(filepath, 'w')
