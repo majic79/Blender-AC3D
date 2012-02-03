@@ -35,7 +35,7 @@ class Object:
 		self.bl_obj = bl_obj
 		self.data = ''				# custom data (eg. description)
 		self.url = ''					# custom url (use for whatever you want but never ever
-		                      #             put spaces into it)
+													#             put spaces into it)
 
 		if bl_obj:
 			self.matrix_world = local_transform * bl_obj.matrix_world
@@ -81,7 +81,7 @@ class Object:
 			strm.write('{0}\n'.format(self.data))
 			
 		if len(self.url):
-		  strm.write('url {0}\n'.format(self.url))
+			strm.write('url {0}\n'.format(self.url))
 
 		if self.parent and self.pos_abs:	
 			# position relative to parent
@@ -162,7 +162,7 @@ class Poly (Object):
 		'''
 		mat_index = 0 # local material index
 		for bl_mat in mesh.materials:
-			ac_mat = Material(bl_mat.name, bl_mat)
+			ac_mat = Material(bl_mat.name, bl_mat, self.export_config)
 
 			mat_exists = False
 			for mat in ac_mats:
@@ -365,7 +365,10 @@ class Material:
 			self.name = bl_mat.name
 			self.rgb = bl_mat.diffuse_color
 			self.amb = [bl_mat.ambient, bl_mat.ambient, bl_mat.ambient]
-			self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
+			if export_config.mircol_as_emis:
+				self.emis = bl_mat.mirror_color * bl_mat.emit
+			else:
+				self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
 			self.spec = bl_mat.specular_color
 			self.shi = int(bl_mat.specular_intensity * 100.0)
 			self.trans = 1.0 - bl_mat.alpha
