@@ -21,6 +21,7 @@ import os
 import struct
 
 import bpy
+import csv
 import mathutils
 from mathutils import Vector, Euler
 from math import radians
@@ -246,6 +247,12 @@ class AcObj:
 
 	def read_rotation(self, ac_file, toks):
 		self.rotation = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
+#		TODO check
+#		rotation = mathutils.Matrix(( [float(x) for x in toks[1:4]],
+#		                              [float(x) for x in toks[4:7]],
+#		                              [float(x) for x in toks[7:10]] )).to_quaternion()
+#		rotation.axis = self.import_config.global_matrix * rotation.axis
+#		self.rotation = rotation.to_matrix()
 		return False
 
 	def read_texture(self, ac_file, toks):
@@ -666,17 +673,16 @@ class ImportAC3D:
 	read our validated .ac file
 	'''
 	def read_ac_file(self, ac_file):
-		line = ac_file.readline()
-		while line != '':
-			toks = line.strip().split()
-			# See if this is a valid token and pass the file handle and the current line to our function
-			if len(toks) > 0:
-				if toks[0] in self.tokens.keys():
-					self.tokens[toks[0]](ac_file,toks)
+		reader = csv.reader(ac_file, delimiter=' ', skipinitialspace=True)
+		try:
+			for row in reader:
+				# See if this is a valid token and pass the file handle and the current line to our function
+				if row[0] in self.tokens.keys():
+					self.tokens[row[0]](ac_file,row)
 				else:
-					self.report_error("invalid token: {tok} ({ln})".format(tok=toks[0], ln=line.strip()))
-
-			line = ac_file.readline()
+					self.report_error("invalid token: {tok} ({ln})".format(tok=row[0], ln=row))				
+		except csv.Error(e):
+			self.report_error('AC3D import error, line %d: %s' % (reader.line_num, e))
 
 	'''
 	Take the passed in line and interpret as a .ac material
@@ -684,8 +690,7 @@ class ImportAC3D:
 	def read_material(self, ac_file, line):
 
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
-
-		self.matlist.append(AcMat(line[1].strip('"'),
+		self.matlist.append(AcMat(line[1],
 						[float(x) for x in line[3:6]],
 						[float(x) for x in line[7:10]],
 						[float(x) for x in line[11:14]],
@@ -700,7 +705,7 @@ class ImportAC3D:
 	'''
 	def read_object(self, ac_file, line):
 		# OBJECT %s
-		self.oblist.append(AcObj(line[1].strip('"'), ac_file, self.import_config))
+		self.oblist.append(AcObj(line[1], ac_file, self.import_config))
 
 	'''
 	Reads the data imported from the file and creates blender data

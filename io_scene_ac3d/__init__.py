@@ -235,11 +235,6 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="export mirror colour as ambient colour",
 							default=False,
 							)
-	export_lamps = BoolProperty(
-							name="Export Lamps",
-							description="Export lamps into AC3D file",
-							default=False,
-							)
 	crease_angle = FloatProperty(
 							name="Default Crease Angle",
 							description="Default crease angle for exported .ac faces",
