@@ -88,7 +88,7 @@ class Object:
 			pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
 
 			location = self.export_config.global_matrix * pos_rel
-			strm.write('loc {0:.4f} {1:.4f} {2:.4f}\n'.format(location[0], location[1], location[2]))
+			strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
 		self._write(strm)
 		strm.write('kids {0}\n'.format(len(self.children)))
@@ -239,7 +239,7 @@ class Poly (Object):
 		if len(self.vertices):
 			strm.write('numvert {0}\n'.format(len(self.vertices)))
 			for vert in self.vertices:
-				strm.write('{0:.6f} {1:.6f} {2:.6f}\n'.format( vert[0],
+				strm.write('{0:.7f} {1:.7f} {2:.7f}\n'.format( vert[0],
 																											 vert[1],
 																											 vert[2] ))
 
