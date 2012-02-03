@@ -109,12 +109,6 @@ class AcMat:
 			bRet = True
 		return bRet
 
-	def save_blender_texture(self, bl_mat):
-		'''
-		save first blender texture that has an impact on diffuse color
-		'''
-		pass
-
 class AcSurf:
 	class AcSurfFlags:
 		def __init__(
@@ -216,43 +210,35 @@ class AcObj:
 		self.data = ''				# custom data (mesh name)
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
+		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))		# 3x3 rotational matrix for vertices
+
+		self.location = None		# translation location of the center relative to the parent object
+		self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
+		self.is_flipped = False
+
 		if bl_obj:
-			self.location = export_config.global_matrix * bl_obj.location
-			rotation = bl_obj.rotation_euler.to_matrix()
-			self.location = export_config.global_matrix * bl_obj.matrix_local.to_translation()
+			# absolute position in world coordinates
+			pos_abs = bl_obj.matrix_world.to_translation()
 
-			rotation = bl_obj.rotation_euler.to_quaternion()
-			rotation.axis = export_config.global_matrix * rotation.axis
-			
-			#global_matrix_abs = Matrix((
-			#  [abs(a) for a in export_config.global_matrix[0]],
-			#  [abs(a) for a in export_config.global_matrix[1]],
-			#  [abs(a) for a in export_config.global_matrix[2]]
-			#))
-			
-			#rotation = Euler(export_config.global_matrix * Vector(bl_obj.rotation_euler[:]))
+			if bl_obj.parent != None:
+				# position relative to parent
+				pos_rel = pos_abs - bl_obj.parent.matrix_world.to_translation()
+			else:
+				pos_rel = pos_abs
 
-			TRACE('{0} {1}'.format(bl_obj.name, bl_obj.scale))
-			TRACE('rot={0} -> {1}'.format(rotation, rotation.to_matrix()))
+			# apply all transformations but translation
+			vertex_transform = Matrix.Translation(-pos_abs) * bl_obj.matrix_world
 
-			self.rotation = rotation.to_matrix()
-
-			matrix_scale = Matrix([[bl_obj.scale[0], 0, 0], [0, bl_obj.scale[1], 0], [0, 0, bl_obj.scale[2]]])
-			
-			TRACE('scale={0}'.format(matrix_scale))
-			
-			self.vertex_transform = export_config.global_matrix * matrix_scale.to_4x4()
-			
+			# detect if normals should be flipped
 			self.is_flipped = bl_obj.scale[0] * bl_obj.scale[1] * bl_obj.scale[2] < 0
-			
-			TRACE('vt={0}'.format(self.vertex_transform))
 
-		else:
-			self.location = None		# translation location of the center relative to the parent object
-			self.rotation = None		# 3x3 rotational matrix for vertices
-			self.vertex_transform = None # 4x4 transformation matrix to be applied to each vertex
-		self.url = ''				# url of the object (??!)
-		self.crease = None			# crease angle for smoothing - modified to bring it closer to defaults requested on blender forum
+			# apply additional export transformation
+			self.location = export_config.global_matrix * pos_rel
+
+			self.vertex_transform = export_config.global_matrix * vertex_transform
+
+		self.crease = self.export_config.crease_angle
+									# crease angle for smoothing - default specified in export config
 		self.vert_list = []			# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
@@ -369,11 +355,10 @@ class AcObj:
 			for mod in self.bl_obj.modifiers:
 				if mod.type=='EDGE_SPLIT':
 					self.crease=degrees(mod.split_angle)
-		if not self.crease:
-			if self.bl_obj.data.use_auto_smooth:
-				self.crease = degrees(self.bl_obj.data.auto_smooth_angle)
-			else:
-				self.crease=self.export_conf.crease_angle
+
+		if self.bl_obj.data.use_auto_smooth:
+			self.crease = degrees(self.bl_obj.data.auto_smooth_angle)
+
 
 		self.parse_blender_materials(self.mesh.materials, ac_mats)
 		self.parse_vertices()

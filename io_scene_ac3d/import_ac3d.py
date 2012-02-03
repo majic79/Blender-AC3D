@@ -245,7 +245,6 @@ class AcObj:
 		return False
 
 	def read_rotation(self, ac_file, toks):
-		TRACE('toks: {0}'.format(toks))
 		self.rotation = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
 		return False
 
@@ -441,7 +440,6 @@ class AcObj:
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
-			TRACE('rotation: {0}'.format(self.rotation))
 			self.bl_obj.rotation_euler = self.rotation.to_euler()
 
 			self.bl_obj.location = self.location

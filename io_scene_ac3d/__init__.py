@@ -206,7 +206,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							default='Y',
 							)
 	use_render_layers = BoolProperty(
-							name="Export Render Layers",
+							name="Only Render Layers",
 							description="Only export from selected render layers",
 							default=True,
 							)
