@@ -124,18 +124,21 @@ class AcMat:
 		if tex_name in bpy.data.images:
 			bl_image = bpy.data.images[tex_name]
 		else:
-			texture_path = None
-			if os.path.exists(tex_name):
-				texture_path = tex_name
-			elif os.path.exists(os.path.join(self.import_config.importdir, tex_name)):
-				texture_path = os.path.join(self.import_config.importdir, tex_name)
-		
-			if texture_path:
-#				TRACE("Loading texture: {0}".format(texture_path))
-				try:
-					bl_image = bpy.data.images.load(texture_path)
-				except:
-					TRACE("Failed to load texture: {0}".format(tex_name))
+			found = False
+			base_name = bpy.path.basename(tex_name)
+			for path in [ tex_name,
+										os.path.join(self.import_config.importdir, tex_name),
+										os.path.join(self.import_config.importdir, base_name) ]:
+				if os.path.exists(path):
+					found = True
+
+					try:
+						bl_image = bpy.data.images.load(path)
+					except:
+						TRACE("Failed to load texture: {0}".format(tex_name))
+			
+			if not found:
+				TRACE("Failed to locate texture: {0}".format(tex_name))
 
 		return bl_image
 
