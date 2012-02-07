@@ -233,7 +233,12 @@ class AcObj:
 
 			line = line.strip().split()
 			if line[0] == 'SURF':
-				self.surf_list.append(AcSurf(line[1], ac_file, self.import_config))
+				surf = AcSurf(line[1], ac_file, self.import_config)
+				# TODO check this fix which just ignores everything but quads and triangles
+				if( len(surf.refs) in [3,4] ):
+					self.surf_list.append(surf)
+				else:
+					TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
 
 	def read_name(self, ac_file, toks):
 		self.name=toks[1].strip('"')
@@ -289,51 +294,6 @@ class AcObj:
 		# This is assumed to be the last thing in the list of things to read
 		# returning True indicates to cease parsing this object
 		return True
-
-	def from_pydata(self, mesh, vertices, edges, faces):
-		# majic: we've adapted the default import routine to make it work correctly for polylines etc! Probably ought to put in a bug report about how the default handles it
-		"""
-		Make a mesh from a list of verts/edges/faces
-		Until we have a nicer way to make geometry, use this.
-
-		:arg vertices: float triplets each representing (X, Y, Z) eg: [(0.0, 1.0, 0.5), ...].
-		:type vertices: iterable object
-		:arg edges: int pairs, each pair contains two indices to the *vertices* argument. eg: [(1, 2), ...]
-		:type edges: iterable object
-		:arg faces: iterator of faces, each faces contains three or four indices to the *vertices* argument. eg: [(5, 6, 8, 9), (1, 2, 3), ...]
-		:type faces: iterable object
-		"""
-		mesh.vertices.add(len(vertices))
-		mesh.edges.add(len(edges))
-		mesh.faces.add(len(faces))
-
-		vertices_flat = [f for v in vertices for f in v]
-		mesh.vertices.foreach_set("co", vertices_flat)
-		del vertices_flat
-
-#		edges_flat = [i for e in edges for i in e]
-#        self.edges.foreach_set("vertices", edges_flat)
-		
-		edges_flat = [e for e in edges]
-		TRACE("Edge Count: {0}".format(len(mesh.edges)))
-		for nEdge in range(len(mesh.edges)):
-			s_edge = mesh.edges[nEdge]
-			s_edge.vertices = edges_flat[nEdge]
-		del edges_flat
-
-		def treat_face(f):
-			if len(f) == 3:
-				if f[2] == 0:
-					return f[2], f[0], f[1], 0
-				else:
-					return f[0], f[1], f[2], 0
-			elif f[2] == 0 or f[3] == 0:
-				return f[2], f[3], f[0], f[1]
-			return f
-		TRACE("len faces = {0}".format(len(faces)))
-		faces_flat = [v for f in faces for v in treat_face(f)]
-		mesh.faces.foreach_set("vertices_raw", faces_flat)
-		del faces_flat
 	
 
 	'''
@@ -348,10 +308,6 @@ class AcObj:
 		if self.type == 'group':
 			# Create an empty object
 			self.bl_obj = bpy.data.objects.new(self.name, None)
-
-		if self.type == 'light':
-			bl_lamp = bpy.data.lamps.new(self.name)
-			self.bl_obj = bpy.data.objects.new(self.name, bl_lamp)
 
 		if self.type == 'poly':
 			meshname = self.name
@@ -380,7 +336,7 @@ class AcObj:
 					# test for invalid face (ie, >4 vertices)
 					if len(surf.refs) > 4 or len(surf.refs) < 3:
 						# not bringing in faces (assumed that there are none in a poly-line)
-						TRACE("Treating face surface as Poly-line (edge-count: {0})".format(len(surf_edges)))
+						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))
 					else:
 
 						self.face_list.append(surf_face)
