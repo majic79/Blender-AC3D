@@ -132,8 +132,8 @@ class Poly (Object):
 			TRACE('{0}  ~ ({1}) {2}'.format( str_pre,
 																			 self.bl_obj.type,
 																			 self.bl_obj.data.name ))
-			if self.bl_obj.type == 'MESH':
-				self._parseMesh(ac_mats)
+			#if self.bl_obj.type == 'MESH':
+			self._parseMesh(ac_mats)
 	
 	def _parseMesh( self, ac_mats ):
 		mesh = self.bl_obj.to_mesh(self.export_config.context.scene, True, 'PREVIEW')

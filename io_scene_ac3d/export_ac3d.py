@@ -143,7 +143,7 @@ class ExportAC3D:
 			if 		(not self.export_conf.use_render_layers or ob.is_visible(self.export_conf.context.scene))\
 				and (not self.export_conf.use_selection or ob.select or ignore_select):
 
-				if ob.type in ['MESH', 'LATTICE', 'SURFACE']: # TODO CURVE
+				if ob.type in ['MESH', 'LATTICE', 'SURFACE', 'CURVE']:
 					ac_ob = AC3D.Poly(ob.name, ob, self.export_conf, local_transform)
 				elif ob.type == 'EMPTY':
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
