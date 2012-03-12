@@ -125,7 +125,7 @@ class Poly (Object):
 		self.tex_name = ''    # texture name (filename of texture)
 		self.tex_rep = [1,1]  # texture repeat
 		self.ac_mats = {}     # Blender to AC3d index cross-reference
-		
+
 	def _parse( self, ac_mats, str_pre ):
 
 		if self.bl_obj:
@@ -141,7 +141,7 @@ class Poly (Object):
 		self._parseMaterials(mesh, ac_mats)
 		self._parseVertices(mesh)		
 		self._parseFaces(mesh)		
-		
+
 		for mod in self.bl_obj.modifiers:
 			if mod.type=='EDGE_SPLIT':
 				self.crease = degrees(mod.split_angle)
@@ -153,7 +153,7 @@ class Poly (Object):
 			else:
 				self.crease = self.export_config.crease_angle
 
-		bpy.data.meshes.remove(mesh)
+		#bpy.data.meshes.remove(mesh)
 		
 	def _parseMaterials( self, mesh, ac_mats ):
 		'''
@@ -218,16 +218,24 @@ class Poly (Object):
 		'''
 		Extract the faces from a blender mesh
 		'''
-		uv_tex = mesh.uv_textures[0] if len(mesh.uv_textures) else None
+		if len(mesh.uv_textures):
+			uv_tex = mesh.tessface_uv_textures.active
+		else:
+			uv_tex = None
+
 		is_flipped = self.bl_obj.scale[0]\
 							 * self.bl_obj.scale[1]\
 							 * self.bl_obj.scale[2] < 0
 
 		for face_idx in range(len(mesh.faces)):
 			bl_face = mesh.faces[face_idx]
-			tex_face = uv_tex.data[face_idx] if uv_tex else None
+			
+			if uv_tex:
+				uv_coords = uv_tex.data[face_idx].uv[:]
+			else:
+				uv_coords = None
 
-			surf = self.Surface(self.export_config, bl_face, self.ac_mats, mesh.show_double_sided, is_flipped, tex_face)
+			surf = self.Surface(self.export_config, bl_face, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords)
 			self.surfaces.append(surf)
 		
 	def _write( self, strm ):
@@ -256,12 +264,11 @@ class Poly (Object):
 									ac_mats,
 									is_two_sided,
 									is_flipped,
-									uv_tex_face ):
+									uv_coords ):
 			self.export_config = export_config
 			self.mat = 0		# material index for this surface
-			self.refs = []		# list of vertex references from the parent mesh
-			self.uv_refs = []	# list of UV referense for texture mapping
-			self.uv_face = uv_tex_face
+			self.bl_face = bl_face
+			self.uv_coords = uv_coords
 			self.is_two_sided = is_two_sided
 			self.is_flipped = is_flipped
 			self.ac_surf_flags = self.SurfaceFlags(0, False, True)
@@ -272,38 +279,23 @@ class Poly (Object):
 			surf_flags = self.ac_surf_flags.getFlags()
 			ac_file.write('SURF {0:#X}\n'.format(surf_flags))
 			ac_file.write('mat {0}\n'.format(self.mat))
-			ac_file.write('refs {0}\n'.format(len(self.refs)))
+			ac_file.write('refs {0}\n'.format(len(self.bl_face.vertices)))
 
-			r = range(len(self.refs))
+			r = range(len(self.bl_face.vertices))
 			if self.is_flipped:
 				r = reversed(r)
 
-			for n in r:
-				surf_ref = self.refs[n]
-				uv_ref = self.uv_refs[n]
-				ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
+			if self.uv_coords:
+				for n in r:
+					surf_ref = self.bl_face.vertices[n]
+					uv_ref = self.uv_coords[n]
+					ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
+			else:
+				for n in r:
+					surf_ref = self.bl_face.vertices[n]
+					ac_file.write('{0} 0 0\n'.format(surf_ref))
 
 		def parse_blender_face(self, bl_face, ac_mats):
-			# Create basic vertex reference list
-			self.refs.append(bl_face.vertices_raw[0])
-			self.refs.append(bl_face.vertices_raw[1])
-			self.refs.append(bl_face.vertices_raw[2])
-
-			if self.uv_face:
-				self.uv_refs.append(self.uv_face.uv1.copy())
-				self.uv_refs.append(self.uv_face.uv2.copy())
-				self.uv_refs.append(self.uv_face.uv3.copy())
-			else:			
-				self.uv_refs.append([0,0])
-				self.uv_refs.append([0,0])
-				self.uv_refs.append([0,0])
-			# working on the basis that vertices are listed in ascending order - if the last vertex is less than the previous, it's a null vertex (so three sided poly)
-			if bl_face.vertices_raw[3] != 0:
-				self.refs.append(bl_face.vertices_raw[3])
-				if self.uv_face:
-					self.uv_refs.append(self.uv_face.uv4.copy())
-				else:
-					self.uv_refs.append([0,0])
 
 			if bl_face.material_index in ac_mats:
 				self.mat = ac_mats[bl_face.material_index]
