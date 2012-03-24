@@ -227,8 +227,8 @@ class Poly (Object):
 							 * self.bl_obj.scale[1]\
 							 * self.bl_obj.scale[2] < 0
 
-		for face_idx in range(len(mesh.faces)):
-			bl_face = mesh.faces[face_idx]
+		for face_idx in range(len(mesh.tessfaces)):
+			bl_face = mesh.tessfaces[face_idx]
 			
 			if uv_tex:
 				uv_coords = uv_tex.data[face_idx].uv[:]
