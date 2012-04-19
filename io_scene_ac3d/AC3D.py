@@ -162,6 +162,8 @@ class Poly (Object):
 		'''
 		mat_index = 0 # local material index
 		for bl_mat in mesh.materials:
+			if not bl_mat:
+				continue
 			ac_mat = Material(bl_mat.name, bl_mat, self.export_config)
 
 			mat_exists = False

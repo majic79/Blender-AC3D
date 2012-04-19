@@ -143,16 +143,18 @@ class ExportAC3D:
 			if 		(not self.export_conf.use_render_layers or ob.is_visible(self.export_conf.context.scene))\
 				and (not self.export_conf.use_selection or ob.select or ignore_select):
 
-				if ob.type in ['MESH', 'LATTICE', 'SURFACE', 'CURVE']:
-					ac_ob = AC3D.Poly(ob.name, ob, self.export_conf, local_transform)
-				elif ob.type == 'EMPTY':
+				# We need to check for dupligroups first as every type of object can be
+				# converted to a dupligroup without removing the data from the old type.
+				if ob.dupli_type == 'GROUP':
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
-					
-					if ob.dupli_type == 'GROUP':
-						children = [child for child in ob.dupli_group.objects
-						                            if not child.parent
-						                            or not child.parent.name in ob.dupli_group.objects]
-						self.parseLevel(ac_ob, children, True, local_transform * ob.matrix_world)
+					children = [child for child in ob.dupli_group.objects
+					                            if not child.parent
+					                            or not child.parent.name in ob.dupli_group.objects]
+					self.parseLevel(ac_ob, children, True, local_transform * ob.matrix_world)
+				elif ob.type in ['MESH', 'LATTICE', 'SURFACE', 'CURVE']:
+					ac_ob = AC3D.Poly(ob.name, ob, self.export_conf, local_transform)
+#				elif ob.type == 'EMPTY':
+#					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 				else:
 					TRACE('Skipping object {0} (type={1})'.format(ob.name, ob.type))
 					
