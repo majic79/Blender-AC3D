@@ -368,11 +368,11 @@ class AcObj:
 			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
 				
-			face_mat = [m for m in self.face_mat_list]
-			bl_mesh.faces.foreach_set("material_index", face_mat)
-			del face_mat
+#			face_mat = [m for m in self.face_mat_list]
+#			bl_mesh.tessfaces.foreach_set("material_index", face_mat)
+#			del face_mat
 
-			if self.tex_name != '':
+			if self.tex_name != '' and False: # TODO
 				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
 
 				two_sided_lighting = False
@@ -383,7 +383,7 @@ class AcObj:
 						# If one surface is twosided, they all will be...
 						two_sided_lighting |= surf.flags.two_sided
 
-						bl_mesh.faces[f_index].use_smooth = surf.flags.shaded
+						bl_mesh.tessfaces[f_index].use_smooth = surf.flags.shaded
 
 						uv_tex.data[f_index].uv1=surf.uv_refs[0]
 						uv_tex.data[f_index].uv2=surf.uv_refs[1]
