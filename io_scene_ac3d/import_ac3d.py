@@ -27,6 +27,7 @@ from mathutils import Vector, Euler
 from math import radians
 from bpy import *
 from bpy_extras.image_utils import load_image
+from bpy_extras.io_utils import unpack_list, unpack_face_list
 
 '''
 This file is a reboot of the AC3D import script that is used to import .ac format file into blender.
@@ -304,7 +305,7 @@ class AcObj:
 		if self.type == 'world':
 			self.name = self.import_config.ac_name
 			self.rotation = self.import_config.global_matrix
-		bl_mesh = None
+		me = None
 		if self.type == 'group':
 			# Create an empty object
 			self.bl_obj = bpy.data.objects.new(self.name, None)
@@ -313,18 +314,18 @@ class AcObj:
 			meshname = self.name
 			if len(self.data)>0:
 				meshname = self.data
-			bl_mesh = bpy.data.meshes.new(meshname)
-			self.bl_obj = bpy.data.objects.new(self.name, bl_mesh)
+			me = bpy.data.meshes.new(meshname)
+			self.bl_obj = bpy.data.objects.new(self.name, me)
 
 		# setup parent object
 		if self.ac_parent:
 			self.bl_obj.parent = self.ac_parent.bl_obj
 
 		# make sure we have something to work with
-		if self.vert_list and bl_mesh:
+		if self.vert_list and me:
 
-			bl_mesh.use_auto_smooth = self.import_config.use_auto_smooth
-			bl_mesh.auto_smooth_angle = radians(self.crease)
+			me.use_auto_smooth = self.import_config.use_auto_smooth
+			me.auto_smooth_angle = radians(self.crease)
 			
 			for surf in self.surf_list:
 				surf_edges = surf.get_edges()
@@ -340,7 +341,7 @@ class AcObj:
 					else:
 
 						self.face_list.append(surf_face)
-
+						
 						# Material index is 1 based, the list we built is 0 based
 						ac_material = ac_matlist[surf.mat_index]
 						bl_material = ac_material.get_blender_material(self.tex_name)
@@ -349,15 +350,15 @@ class AcObj:
 							TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
 
 						fm_index = 0
-						if not bl_material.name in bl_mesh.materials:
-							bl_mesh.materials.append(bl_material)
-							fm_index = len(bl_mesh.materials)-1
+						if not bl_material.name in me.materials:
+							me.materials.append(bl_material)
+							fm_index = len(me.materials)-1
 						else:
-							for mat in bl_mesh.materials:
+							for mat in me.materials:
 								if mat == bl_material:
 									continue
 								fm_index += 1
-							if fm_index > len(bl_mesh.materials):
+							if fm_index > len(me.materials):
 								TRACE("Failed to find material index")
 								fm_index = 0
 						self.face_mat_list.append(fm_index)
@@ -365,44 +366,54 @@ class AcObj:
 					# treating as a polyline (nothing more to do)
 					pass
 
-			bl_mesh.from_pydata(self.vert_list, self.edge_list, self.face_list)
-
+			me.vertices.add(len(self.vert_list))
+			me.tessfaces.add(len(self.face_list))
+			
+			# verts_loc is a list of (x, y, z) tuples
+			me.vertices.foreach_set("co", unpack_list(self.vert_list))
+			
+			# faces is a list of (vert_indices, texco_indices, ...) tuples
+			me.tessfaces.foreach_set("vertices_raw", unpack_face_list(self.face_list))
 				
 #			face_mat = [m for m in self.face_mat_list]
-#			bl_mesh.tessfaces.foreach_set("material_index", face_mat)
+#			me.tessfaces.foreach_set("material_index", face_mat)
 #			del face_mat
+				
+			if len(self.tex_name):
+				me.tessface_uv_textures.new()
+#				uv_tex.active = True
+#				uv_tex.active_render = True
+			else:
+				uv_tex = None
+				
+			two_sided_lighting = False
+				
+			for i, face in enumerate(self.face_list):
+				blender_face = me.tessfaces[i]
+				surf = self.surf_list[i]
+				
+				blender_face.use_smooth = surf.flags.shaded
 
-			if self.tex_name != '' and False: # TODO
-				uv_tex = bl_mesh.uv_textures.new(self.tex_name)
+				# If one surface is twosided, they all will be...
+				two_sided_lighting |= surf.flags.two_sided
 
-				two_sided_lighting = False
+				if len(self.tex_name) and len(surf.uv_refs) >= 3:
+					blender_tface = me.tessface_uv_textures[0].data[i]
 
-				for f_index in range(len(self.surf_list)):
-					if len(self.surf_list[f_index].refs)<= 4 and len(self.surf_list[f_index].refs) >= 3:
-						surf = self.surf_list[f_index]
-						# If one surface is twosided, they all will be...
-						two_sided_lighting |= surf.flags.two_sided
+					blender_tface.uv1 = surf.uv_refs[0]
+					blender_tface.uv2 = surf.uv_refs[1]
+					blender_tface.uv3 = surf.uv_refs[2]
 
-						bl_mesh.tessfaces[f_index].use_smooth = surf.flags.shaded
+					if len(surf.uv_refs) > 3:
+						blender_tface.uv4 = surf.uv_refs[3]
 
-						uv_tex.data[f_index].uv1=surf.uv_refs[0]
-						uv_tex.data[f_index].uv2=surf.uv_refs[1]
-						uv_tex.data[f_index].uv3=surf.uv_refs[2]
+					surf_material = me.materials[self.face_mat_list[i]]
+					blender_tface.image = surf_material.texture_slots[0].texture.image
 
-						if len(surf.uv_refs) > 3:
-							uv_tex.data[f_index].uv4=surf.uv_refs[3]
-
-						surf_material = bl_mesh.materials[self.face_mat_list[f_index]]
-						surf_image = surf_material.texture_slots[0].texture.image
-
-						uv_tex.data[f_index].image = surf_image
 #						uv_tex.data[f_index].use_image = True
 
-				bl_mesh.show_double_sided = two_sided_lighting
-
-				uv_tex.active = True
-				uv_tex.active_render = True
-				
+			me.show_double_sided = two_sided_lighting
+			
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
@@ -433,9 +444,11 @@ class AcObj:
 			obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
 
 
-		if bl_mesh:
-			bl_mesh.calc_normals()
-			bl_mesh.update(calc_edges=True)
+		if me:
+#			me.calc_normals()
+			me.validate()
+			me.update(calc_edges=True)
+
 		
 class AcSurf:
 	class AcSurfFlags:
