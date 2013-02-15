@@ -667,7 +667,7 @@ class ImportAC3D:
 						[float(x) for x in line[7:10]],
 						[float(x) for x in line[11:14]],
 						[float(x) for x in line[15:18]],
-						int(line[19]),
+						float(line[19]), # it should be int but float seems to be used sometimes
 						float(line[21]),
 						self.import_config,
 						))
