@@ -103,13 +103,13 @@ class ExportAC3D:
 										)
 
 			#TRACE("Global: {0}".format(global_matrix))
-			
+
 			self.ac_mats = [AC3D.Material()]
 			self.ac_world = None
 
 			# Parsing the tree in a top down manner and check on the way down which
 			# objects are to be exported
-			
+
 			self.world = AC3D.World('Blender_export__' + bpy.path.basename(filepath), self.export_conf)
 			self.parseLevel(self.world, [ob for ob in bpy.data.objects if ob.parent == None and not ob.library])
 			self.world.parse(self.ac_mats)
@@ -153,11 +153,23 @@ class ExportAC3D:
 					self.parseLevel(ac_ob, children, True, local_transform * ob.matrix_world)
 				elif ob.type in ['MESH', 'LATTICE', 'SURFACE', 'CURVE']:
 					ac_ob = AC3D.Poly(ob.name, ob, self.export_conf, local_transform)
+				elif ob.type == 'ARMATURE':
+					p = parent
+					for bone in ob.pose.bones:
+						for c in ob.children:
+							if c.parent_bone == bone.name:
+								ac_child = AC3D.Poly(c.name, c, self.export_conf, local_transform)
+								p.addChild(ac_child)
+								p = ac_child
+
+								if len(c.children):
+									self.parseLevel(p, c.children, ignore_select, local_transform)
+					continue
 #				elif ob.type == 'EMPTY':
 #					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 				else:
 					TRACE('Skipping object {0} (type={1})'.format(ob.name, ob.type))
-					
+
 			if ac_ob:
 				parent.addChild(ac_ob)
 				next_parent = ac_ob

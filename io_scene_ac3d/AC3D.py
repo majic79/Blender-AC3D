@@ -2,7 +2,7 @@ import bpy, os, shutil
 from math import radians, degrees
 from mathutils import Vector, Matrix
 
-DEBUG = True
+DEBUG = False
 
 def TRACE(message):
 	if DEBUG:
@@ -51,7 +51,6 @@ class Object:
 								child ):
 		if not isinstance(child, Object):
 			raise Exception('addChild: can only add childs derived from Object')
-
 		child.parent = self
 		self.children.append(child)
 		
