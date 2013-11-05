@@ -87,7 +87,8 @@ class Object:
 			pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
 
 			location = self.export_config.global_matrix * pos_rel
-			strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
+			if any(c != 0 for c in location):
+				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
 		self._write(strm)
 		strm.write('kids {0}\n'.format(len(self.children)))
