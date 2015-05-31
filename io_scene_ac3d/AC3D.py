@@ -242,6 +242,8 @@ class Poly (Object):
 		
 	def _write( self, strm ):
 
+		strm.write('crease {0}\n'.format(self.crease))		
+
 		if len(self.tex_name) > 0:
 			strm.write('texture "{0}"\n'.format(self.tex_name))
 			strm.write('texrep {0} {1}\n'.format(self.tex_rep[0], self.tex_rep[1]))
