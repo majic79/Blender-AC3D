@@ -29,9 +29,6 @@ Known Issues:
    * There's an option "Export Render Layer" - ie, only export what's currently
      visible - this doesn't work, but is in the plan
 
- - Importer:
-   * No ngons yet.
-
 Things to come:
 	- I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
 

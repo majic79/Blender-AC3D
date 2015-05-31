@@ -28,6 +28,7 @@ from math import radians
 from bpy import *
 from bpy_extras.image_utils import load_image
 from bpy_extras.io_utils import unpack_list, unpack_face_list
+from bpy_extras.mesh_utils import ngon_tessellate
 
 '''
 This file is a reboot of the AC3D import script that is used to import .ac format file into blender.
@@ -237,11 +238,29 @@ class AcObj:
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				surf = AcSurf(line[1], ac_file, self.import_config)
-				# TODO check this fix which just ignores everything but quads and triangles
 				if( len(surf.refs) in [3,4] ):
 					self.surf_list.append(surf)
 				else:
-					TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
+					if(len(surf.refs) > 4):
+						print(surf.refs)
+						tess = ngon_tessellate(self.vert_list, surf.refs)
+						print(tess)
+						for triangle in tess:
+							new_triangle = []
+							for tri_index in triangle:
+								new_triangle.append(surf.refs[tri_index])
+							uv_rfs = []
+							
+							for ref_index in new_triangle:
+								for i, uv_indx in enumerate(surf.uv_refs):
+									uv_rf = surf.refs[i]
+									if(uv_rf == ref_index):
+										uv_rfs.append(uv_indx)
+
+							subsurf = AcSurfNgon(surf.flags, surf.mat_index, new_triangle, uv_rfs, surf.import_config)
+							self.surf_list.append(subsurf)
+					else:
+						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
 
 	def read_name(self, ac_file, toks):
 		self.name=toks[1].strip('"')
@@ -451,6 +470,35 @@ class AcObj:
 			me.validate()
 			me.update(calc_edges=True)
 
+
+class AcSurfNgon:
+	def __init__(self, flags, mat_index, refs, uv_refs, import_config):
+		self.flags = flags			# surface flags
+		self.mat_index = mat_index				# default material
+		self.refs = refs				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
+		self.uv_refs = uv_refs
+		self.import_config = import_config
+
+	def get_faces(self):
+		# convert refs and surface type to faces
+		surf_faces = []
+		# make sure it's a face type polygon and that there's the right number of vertices
+		if self.flags.type == 0 and len(self.refs) in [3,4]:
+			surf_faces = self.refs
+		return surf_faces
+
+	def get_edges(self):
+		# convert refs and surface type to edges
+		surf_edges = []
+		if self.flags.type != 0:
+			# poly-line
+			for x in range(len(self.refs)-1):
+				surf_edges.append([self.refs[x],self.refs[x+1]])
+
+			if self.flags.type == 1:
+				# closed poly-line
+				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
+		return surf_edges
 		
 class AcSurf:
 	class AcSurfFlags:
