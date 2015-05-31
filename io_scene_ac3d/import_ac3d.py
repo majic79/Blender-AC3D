@@ -73,6 +73,7 @@ class AcMat:
 		self.import_config = import_config
 
 	def make_blender_mat(self, bl_mat):
+		bl_mat.specular_shader = 'PHONG'
 		bl_mat.diffuse_color = self.rgb
 		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
 		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
