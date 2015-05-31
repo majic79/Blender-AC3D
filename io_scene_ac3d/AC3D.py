@@ -366,7 +366,7 @@ class Material:
 			else:
 				self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
 			self.spec = bl_mat.specular_intensity * bl_mat.specular_color
-			self.shi = bl_mat.specular_hardness
+			self.shi = int(bl_mat.specular_hardness * (128/511))
 			if bl_mat.use_transparency:
 				self.trans = 1.0 - bl_mat.alpha
 			else:
