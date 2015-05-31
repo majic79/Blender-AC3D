@@ -115,7 +115,7 @@ class AcMat:
 				tex_slot.alpha_factor = 1.0
 				tex_slot.use_map_alpha = True
 				tex_slot.use = True
-				tex_slot.uv_layer = tex_name
+				tex_slot.uv_layer = 'UVMap'
 				self.bmat_keys[tex_name] = bl_mat
 		return bl_mat
 
