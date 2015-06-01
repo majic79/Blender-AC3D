@@ -238,7 +238,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 	crease_angle = FloatProperty(
 							name="Default Crease Angle",
 							description="Default crease angle for exported .ac faces",
-							default=radians(179.0),
+							default=radians(35.0),
 							options={"ANIMATABLE"},
 							unit="ROTATION",
 							subtype="ANGLE",
