@@ -242,6 +242,8 @@ class Poly (Object):
 		
 	def _write( self, strm ):
 
+		strm.write('crease {0}\n'.format(self.crease))		
+
 		if len(self.tex_name) > 0:
 			strm.write('texture "{0}"\n'.format(self.tex_name))
 			strm.write('texrep {0} {1}\n'.format(self.tex_rep[0], self.tex_rep[1]))
@@ -364,7 +366,7 @@ class Material:
 			else:
 				self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
 			self.spec = bl_mat.specular_intensity * bl_mat.specular_color
-			self.shi = bl_mat.specular_hardness
+			self.shi = int(bl_mat.specular_hardness * (128/511))
 			if bl_mat.use_transparency:
 				self.trans = 1.0 - bl_mat.alpha
 			else:

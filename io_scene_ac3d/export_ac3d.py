@@ -85,7 +85,7 @@ class ExportAC3D:
 			global_coords=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
-			crease_angle=radians(179.0),
+			crease_angle=radians(35.0),
 			):
 
 			self.export_conf = ExportConf(
@@ -165,8 +165,8 @@ class ExportAC3D:
 								if len(c.children):
 									self.parseLevel(p, c.children, ignore_select, local_transform)
 					continue
-#				elif ob.type == 'EMPTY':
-#					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
+				elif ob.type == 'EMPTY':
+					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 				else:
 					TRACE('Skipping object {0} (type={1})'.format(ob.name, ob.type))
 
