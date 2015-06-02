@@ -151,7 +151,7 @@ class Poly (Object):
 			if mesh.use_auto_smooth:
 				self.crease = degrees(mesh.auto_smooth_angle)
 			else:
-				self.crease = self.export_config.crease_angle
+				self.crease = degrees(self.export_config.crease_angle)
 
 		#bpy.data.meshes.remove(mesh)
 		
