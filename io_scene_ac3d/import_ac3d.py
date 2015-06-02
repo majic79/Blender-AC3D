@@ -387,12 +387,15 @@ class AcObj:
 					# treating as a polyline (nothing more to do)
 					pass
 
+			# this gives an error when adding UV coords afterwards, long story..
 			#me.from_pydata(self.vert_list,[],self.face_list);
 
 			me.vertices.add(len(self.vert_list))
 			me.tessfaces.add(len(self.face_list))
 			
 			# verts_loc is a list of (x, y, z) tuples
+			# Since I am now adding an extra vertex, I prefer to do this manually instead
+			#me.vertices.foreach_set("co", unpack_list(self.vert_list))
 
 			theVerts = []
 			for aVert in self.vert_list:
@@ -400,24 +403,11 @@ class AcObj:
 
 			me.vertices.foreach_set("co", theVerts)
 
-
 			# add an extra vertex that is copy of the first. Then never use the first and remove the first after mesh is done.
-			# reason is that when building faces, the last index of a quad cannot be pointing to first vertex, so I let it point at the last
+			# reason is that when building faces, the last index of a quad cannot be pointing to first vertex. (stupid blender thing)
+			# For that reason I let all faces that reference the first vertex reference the last copy, so that I can cleanly remove the first afterwards.
 			me.vertices.add(1)
 			me.vertices[len(self.vert_list)].co = self.vert_list[0]
-
-			#me.vertices.foreach_set("co", unpack_list(self.vert_list))
-			
-			# faces is a list of (vert_indices, texco_indices, ...) tuples
-
-#			theFaces = []
-#			for aFace in self.face_list:
-#				if(len(aFace) == 3):
-#					theFaces.extend([aFace[0], aFace[1], aFace[2], -1])
-#				elif(len(aFace) == 4):
-#					theFaces.extend([aFace[0], aFace[1], aFace[2], aFace[3]])
-
-#			me.tessfaces.foreach_set("vertices_raw", theFaces)
 
 			for i in range(len(self.face_list)):
 				if(self.face_list[i][0] == 0):
@@ -435,8 +425,20 @@ class AcObj:
 					NewFace = (self.face_list[i][0],self.face_list[i][1],self.face_list[i][2],self.face_list[i][3])
 					me.tessfaces[i].vertices_raw = NewFace
 
-				# don't use this automated method, it messes up the vertex order sometimes (will make UV problems)
+			# don't use this automated method, it messes up the vertex order sometimes (will make UV problems, and possible also normal problems)
+			# if want an example AC file that produce this error just ask me. - Nikolai
 #			me.tessfaces.foreach_set("vertices_raw", unpack_face_list(self.face_list))
+
+#           same for this automated method, makes the same bug at times
+#			theFaces = []
+#			for aFace in self.face_list:
+#				if(len(aFace) == 3):
+#					theFaces.extend([aFace[0], aFace[1], aFace[2], -1])
+#				elif(len(aFace) == 4):
+#					theFaces.extend([aFace[0], aFace[1], aFace[2], aFace[3]])
+
+#			me.tessfaces.foreach_set("vertices_raw", theFaces)
+
 				
 #			face_mat = [m for m in self.face_mat_list]
 #			me.tessfaces.foreach_set("material_index", face_mat)
@@ -463,6 +465,7 @@ class AcObj:
 				if len(self.tex_name) and len(surf.uv_refs) >= 3:
 					blender_tface = me.tessface_uv_textures[0].data[i]
 
+#                   Better way to do it, but no reason to change something that works
 #					if len(surf.uv_refs) == 3:
 #						blender_tface.uv = [surf.uv_refs[0],surf.uv_refs[1],surf.uv_refs[2]]
 #					else:
