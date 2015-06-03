@@ -333,7 +333,7 @@ class AcObj:
 			self.bl_obj = bpy.data.objects.new(self.name, None)
 
 		if self.type == 'poly':
-			meshname = self.name
+			meshname = self.name+".mesh"
 			if len(self.data)>0:
 				meshname = self.data
 			me = bpy.data.meshes.new(meshname)
