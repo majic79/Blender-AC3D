@@ -240,13 +240,11 @@ class AcObj:
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				surf = AcSurf(line[1], ac_file, self.import_config)
-				if( len(surf.refs) in [3,4] ):
+				if( surf.flags.type != 0 or len(surf.refs) in [3,4] ):
 					self.surf_list.append(surf)
 				else:
 					if(len(surf.refs) > 4):
-						print(surf.refs)
 						tess = ngon_tessellate(self.vert_list, surf.refs)
-						print(tess)
 						for triangle in tess:
 							new_triangle = []
 							for tri_index in triangle:
@@ -411,6 +409,16 @@ class AcObj:
 			# For that reason I let all faces that reference the first vertex reference the last copy, so that I can cleanly remove the first afterwards.
 			me.vertices.add(1)
 			me.vertices[len(self.vert_list)].co = self.vert_list[0]
+
+			#edges
+			me.edges.add(len(self.edge_list))
+			for i in range(len(self.edge_list)):
+				if(self.edge_list[i][0] == 0):
+					self.edge_list[i][0] = len(self.vert_list)
+				if(self.edge_list[i][1] == 0):
+					self.edge_list[i][1] = len(self.vert_list)
+				NewEdge = (self.edge_list[i][0], self.edge_list[i][1])
+				me.edges[i].vertices = NewEdge
 
 			for i in range(len(self.face_list)):
 				if(self.face_list[i][0] == 0):
@@ -635,11 +643,11 @@ class AcSurf:
 		if self.flags.type != 0:
 			# poly-line
 			for x in range(len(self.refs)-1):
-				surf_edges.append([self.refs[x],self.refs[x+1]])
+				surf_edges.append([self.refs[x], self.refs[x+1]])
 
 			if self.flags.type == 1:
 				# closed poly-line
-				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
+				surf_edges.append([self.refs[len(self.refs)-1], self.refs[0]])
 		return surf_edges
 
 class ImportConf:

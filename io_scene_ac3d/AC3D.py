@@ -241,8 +241,15 @@ class Poly (Object):
 			else:
 				uv_coords = None
 
-			surf = self.Surface(self.export_config, bl_face, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords)
+			surf = self.Surface(self.export_config, bl_face, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords, 0)
 			self.surfaces.append(surf)
+
+		for edge_idx in range(len(mesh.edges)):
+			bl_edge = mesh.edges[edge_idx]
+			
+			edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
+			self.surfaces.append(edge)
+
 		
 	def _write( self, strm ):
 
@@ -272,14 +279,15 @@ class Poly (Object):
 									ac_mats,
 									is_two_sided,
 									is_flipped,
-									uv_coords ):
+									uv_coords,
+									surf_type ):
 			self.export_config = export_config
 			self.mat = 0		# material index for this surface
 			self.bl_face = bl_face
 			self.uv_coords = uv_coords
 			self.is_two_sided = is_two_sided
 			self.is_flipped = is_flipped
-			self.ac_surf_flags = self.SurfaceFlags(0, False, True)
+			self.ac_surf_flags = self.SurfaceFlags(surf_type, False, True)
 
 			self.parse_blender_face(bl_face, ac_mats)
 
@@ -305,11 +313,19 @@ class Poly (Object):
 
 		def parse_blender_face(self, bl_face, ac_mats):
 
-			if bl_face.material_index in ac_mats:
-				self.mat = ac_mats[bl_face.material_index]
-	
-			self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
-			self.ac_surf_flags.twosided = self.is_two_sided
+			try:
+				if bl_face.material_index in ac_mats:
+					self.mat = ac_mats[bl_face.material_index]
+			except:
+				#is edge
+				self.mat = 0
+			try:
+				self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
+				self.ac_surf_flags.twosided = self.is_two_sided
+			except:
+				#is edge
+				self.ac_surf_flags.smooth_shaded = True
+				self.ac_surf_flags.twosided = True
 		
 		class SurfaceFlags:
 			def __init__( self,
