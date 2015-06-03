@@ -91,7 +91,7 @@ class AcMat:
 	'''
 	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
 	'''
-	def get_blender_material(self, tex_name=''):
+	def get_blender_material(self, texrep, tex_name=''):
 		bl_mat = None
 		tex_slot = None
 		if tex_name == '':
@@ -102,8 +102,8 @@ class AcMat:
 
 				self.bl_material = bl_mat
 		else:
-			if tex_name in self.bmat_keys:
-				bl_mat = self.bmat_keys[tex_name]
+			if (tex_name+str(texrep[0])+'-'+str(texrep[1])) in self.bmat_keys:
+				bl_mat = self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])]
 			else:
 				bl_mat = bpy.data.materials.new(self.name)
 				bl_mat = self.make_blender_mat(bl_mat)
@@ -111,13 +111,15 @@ class AcMat:
 				bl_mat.use_face_texture_alpha = True
 				
 				tex_slot = bl_mat.texture_slots.add()
-				tex_slot.texture = self.get_blender_texture(tex_name)
+				tex_slot.texture = self.get_blender_texture(tex_name, texrep)
 				tex_slot.texture_coords = 'UV'
 				tex_slot.alpha_factor = 1.0
 				tex_slot.use_map_alpha = True
 				tex_slot.use = True
 				tex_slot.uv_layer = 'UVMap'
-				self.bmat_keys[tex_name] = bl_mat
+				tex_slot.texture.repeat_x = texrep[0]
+				tex_slot.texture.repeat_y = texrep[1]
+				self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])] = bl_mat
 		return bl_mat
 
 	'''
@@ -149,9 +151,9 @@ class AcMat:
 	'''
 	looks for the blender texture, adds it if it doesn't exist
 	'''
-	def get_blender_texture(self, tex_name):
+	def get_blender_texture(self, tex_name, texrep):
 		bl_tex = None
-		if tex_name in bpy.data.textures:
+		if tex_name in bpy.data.textures and bpy.data.textures[tex_name].repeat_x == texrep[0] and bpy.data.textures[tex_name].repeat_y == texrep[1]:
 			bl_tex = bpy.data.textures[tex_name]
 		else:
 			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
@@ -290,7 +292,8 @@ class AcObj:
 		return False
 
 	def read_texrep(self, ac_file, toks):
-		self.texrep=toks[1:2]
+		self.texrep[0]=int(toks[1])
+		self.texrep[1]=int(toks[2])
 		return False
 
 	def read_texoff(self, ac_file, toks):
@@ -365,7 +368,7 @@ class AcObj:
 						
 						# Material index is 1 based, the list we built is 0 based
 						ac_material = ac_matlist[surf.mat_index]
-						bl_material = ac_material.get_blender_material(self.tex_name)
+						bl_material = ac_material.get_blender_material(self.texrep, self.tex_name)
 
 						if bl_material == None:
 							TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))

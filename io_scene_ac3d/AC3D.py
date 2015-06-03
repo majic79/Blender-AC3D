@@ -200,6 +200,10 @@ class Poly (Object):
 							# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
 						
 						self.tex_name = tex_name
+						try:
+							self.tex_rep = [tex_slot.texture.repeat_x, tex_slot.texture.repeat_y]
+						except:
+							print("Failed to export texrep")
 						break
 
 			# Blender to AC3d index cross-reference
