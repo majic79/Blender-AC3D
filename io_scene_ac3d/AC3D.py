@@ -224,31 +224,45 @@ class Poly (Object):
 		'''
 		Extract the faces from a blender mesh
 		'''
+		uv_layer = None
 		if len(mesh.uv_textures):
-			uv_tex = mesh.tessface_uv_textures.active
-		else:
-			uv_tex = None
+			uv_index = mesh.uv_textures.active_index
+			if mesh.uv_textures[uv_index] != None:
+				uv_layer = mesh.uv_layers.active.data[:]
 
 		is_flipped = self.bl_obj.scale[0]\
 							 * self.bl_obj.scale[1]\
 							 * self.bl_obj.scale[2] < 0
 
-		for face_idx in range(len(mesh.tessfaces)):
-			bl_face = mesh.tessfaces[face_idx]
+		for face_idx in range(len(mesh.polygons)):
+			poly = mesh.polygons[face_idx]
 			
-			if uv_tex:
-				uv_coords = uv_tex.data[face_idx].uv[:]
+			uv_coords = []
+			no_uv = False
+			if(uv_layer):
+				for loop_index in range(poly.loop_start, poly.loop_start + poly.loop_total):
+					#print("    Vertex: %d" % mesh.loops[loop_index].vertex_index)
+					#print("    UV: %r" % uv_layer[loop_index].uv)
+					uv_coords.append(uv_layer[loop_index].uv)
+					if(not uv_layer[loop_index].uv):
+						no_uv = True
+
 			else:
+				no_uv = True				
+
+			if(no_uv):
 				uv_coords = None
 
-			surf = self.Surface(self.export_config, bl_face, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords, 0)
+			surf = self.Surface(self.export_config, poly, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords, 0)
 			self.surfaces.append(surf)
 
-		for edge_idx in range(len(mesh.edges)):
-			bl_edge = mesh.edges[edge_idx]
-			
-			edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
-			self.surfaces.append(edge)
+		# Commented out due to it will not only output standalone edges, but all edges around polygons also
+		#
+		#for edge_idx in range(len(mesh.edges)):
+		#	bl_edge = mesh.edges[edge_idx]
+		#	
+		#	edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
+		#	self.surfaces.append(edge)
 
 		
 	def _write( self, strm ):
