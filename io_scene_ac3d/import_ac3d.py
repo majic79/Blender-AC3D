@@ -181,6 +181,7 @@ class AcObj:
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
+		self.surf_face_list = []    # list of surfs that is faces, no edges
 		self.edge_list = []			# spare edge list (handles poly lines etc)
 		self.face_mat_list = []		# flattened surface material index list
 		self.children = []			
@@ -240,27 +241,10 @@ class AcObj:
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				surf = AcSurf(line[1], ac_file, self.import_config)
-				if( surf.flags.type != 0 or len(surf.refs) in [3,4] ):
+				if( surf.flags.type != 0 or len(surf.refs) > 2):
 					self.surf_list.append(surf)
 				else:
-					if(len(surf.refs) > 4):
-						tess = ngon_tessellate(self.vert_list, surf.refs)
-						for triangle in tess:
-							new_triangle = []
-							for tri_index in triangle:
-								new_triangle.append(surf.refs[tri_index])
-							uv_rfs = []
-							
-							for ref_index in new_triangle:
-								for i, uv_indx in enumerate(surf.uv_refs):
-									uv_rf = surf.refs[i]
-									if(uv_rf == ref_index):
-										uv_rfs.append(uv_indx)
-
-							subsurf = AcSurfNgon(surf.flags, surf.mat_index, new_triangle, uv_rfs, surf.import_config)
-							self.surf_list.append(subsurf)
-					else:
-						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
+					TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
 
 	def read_name(self, ac_file, toks):
 		self.name=toks[1].strip('"')
@@ -290,8 +274,8 @@ class AcObj:
 		return False
 
 	def read_texrep(self, ac_file, toks):
-		self.texrep[0]=int(toks[1])
-		self.texrep[1]=int(toks[2])
+		self.texrep[0]=int(float(toks[1]))
+		self.texrep[1]=int(float(toks[2]))
 		return False
 
 	def read_texoff(self, ac_file, toks):
@@ -348,21 +332,28 @@ class AcObj:
 
 			me.use_auto_smooth = self.import_config.use_auto_smooth
 			me.auto_smooth_angle = radians(self.crease)
-			
+			two_sided_lighting = False
+			has_uv = False
 			for surf in self.surf_list:
 				surf_edges = surf.get_edges()
 				surf_face = surf.get_faces()
-				for edge in surf_edges:
-					self.edge_list.append(edge)
+
+				for line in surf_edges:
+					self.edge_list.append(line)
 
 				if surf.flags.type == 0:
 					# test for invalid face (ie, >4 vertices)
-					if len(surf.refs) > 4 or len(surf.refs) < 3:
+					if len(surf.refs) < 3:
 						# not bringing in faces (assumed that there are none in a poly-line)
 						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))
 					else:
+						# If one surface is twosided, they all will be...
+						two_sided_lighting |= surf.flags.two_sided
+
+						has_uv |= len(surf.uv_refs) > 0
 
 						self.face_list.append(surf_face)
+						self.surf_face_list.append(surf)
 						
 						# Material index is 1 based, the list we built is 0 based
 						ac_material = ac_matlist[surf.mat_index]
@@ -388,116 +379,37 @@ class AcObj:
 					# treating as a polyline (nothing more to do)
 					pass
 
-			# this gives an error when adding UV coords afterwards, long story..
-			#me.from_pydata(self.vert_list,[],self.face_list);
+			me.from_pydata(self.vert_list, self.edge_list, self.face_list);
 
-			me.vertices.add(len(self.vert_list))
-			me.tessfaces.add(len(self.face_list))
+			y=0	
+			for no, poly in enumerate(me.polygons):
+				if self.surf_face_list[no].flags.shaded == True:
+					poly.use_smooth = True
+				else:
+					poly.use_smooth = False
+				y= y+1			
+
 			
-			# verts_loc is a list of (x, y, z) tuples
-			# Since I am now adding an extra vertex, I prefer to do this manually instead
-			#me.vertices.foreach_set("co", unpack_list(self.vert_list))
+			if has_uv:
+				uvtex = me.uv_textures.new()
+				if uvtex:
+					uvtexdata = me.uv_layers.active.data[:]
+					
+					uv_pointer = 0
+					for i, face in enumerate(self.face_list):
+						surf = self.surf_face_list[i]
+						
+						if len(surf.uv_refs) >= 3:
 
-			theVerts = []
-			for aVert in self.vert_list:
-				theVerts.extend([aVert[0], aVert[1], aVert[2]])
-
-			me.vertices.foreach_set("co", theVerts)
-
-			# add an extra vertex that is copy of the first. Then never use the first and remove the first after mesh is done.
-			# reason is that when building faces, the last index of a quad cannot be pointing to first vertex. (stupid blender thing)
-			# For that reason I let all faces that reference the first vertex reference the last copy, so that I can cleanly remove the first afterwards.
-			me.vertices.add(1)
-			me.vertices[len(self.vert_list)].co = self.vert_list[0]
-
-			#edges
-			me.edges.add(len(self.edge_list))
-			for i in range(len(self.edge_list)):
-				if(self.edge_list[i][0] == 0):
-					self.edge_list[i][0] = len(self.vert_list)
-				if(self.edge_list[i][1] == 0):
-					self.edge_list[i][1] = len(self.vert_list)
-				NewEdge = (self.edge_list[i][0], self.edge_list[i][1])
-				me.edges[i].vertices = NewEdge
-
-			for i in range(len(self.face_list)):
-				if(self.face_list[i][0] == 0):
-					self.face_list[i][0] = len(self.vert_list)
-				if(self.face_list[i][1] == 0):
-					self.face_list[i][1] = len(self.vert_list)
-				if(self.face_list[i][2] == 0):
-					self.face_list[i][2] = len(self.vert_list)
-				if(len(self.face_list[i]) == 3):
-					NewFace = (self.face_list[i][0],self.face_list[i][1],self.face_list[i][2])
-					me.tessfaces[i].vertices = NewFace
-				else:					
-					if(self.face_list[i][3] == 0):
-						self.face_list[i][3] = len(self.vert_list)
-					NewFace = (self.face_list[i][0],self.face_list[i][1],self.face_list[i][2],self.face_list[i][3])
-					me.tessfaces[i].vertices_raw = NewFace
-
-			# don't use this automated method, it messes up the vertex order sometimes (will make UV problems, and possible also normal problems)
-			# if want an example AC file that produce this error just ask me. - Nikolai
-#			me.tessfaces.foreach_set("vertices_raw", unpack_face_list(self.face_list))
-
-#           same for this automated method, makes the same bug at times
-#			theFaces = []
-#			for aFace in self.face_list:
-#				if(len(aFace) == 3):
-#					theFaces.extend([aFace[0], aFace[1], aFace[2], -1])
-#				elif(len(aFace) == 4):
-#					theFaces.extend([aFace[0], aFace[1], aFace[2], aFace[3]])
-
-#			me.tessfaces.foreach_set("vertices_raw", theFaces)
-
-				
-#			face_mat = [m for m in self.face_mat_list]
-#			me.tessfaces.foreach_set("material_index", face_mat)
-#			del face_mat
-				
-			if len(self.tex_name):
-				me.tessface_uv_textures.new()
-#				uv_tex.active = True
-#				uv_tex.active_render = True
-			else:
-				uv_tex = None
-				
-			two_sided_lighting = False
-				
-			for i, face in enumerate(self.face_list):
-				blender_face = me.tessfaces[i]
-				surf = self.surf_list[i]
-				
-				blender_face.use_smooth = surf.flags.shaded
-
-				# If one surface is twosided, they all will be...
-				two_sided_lighting |= surf.flags.two_sided
-
-				if len(self.tex_name) and len(surf.uv_refs) >= 3:
-					blender_tface = me.tessface_uv_textures[0].data[i]
-
-#                   Better way to do it, but no reason to change something that works
-#					if len(surf.uv_refs) == 3:
-#						blender_tface.uv = [surf.uv_refs[0],surf.uv_refs[1],surf.uv_refs[2]]
-#					else:
-#						blender_tface.uv = [surf.uv_refs[0],surf.uv_refs[1],surf.uv_refs[2],surf.uv_refs[3]]
-
-
-
-					blender_tface.uv1 = surf.uv_refs[0]
-					blender_tface.uv2 = surf.uv_refs[1]
-					blender_tface.uv3 = surf.uv_refs[2]
-
-					if len(surf.uv_refs) > 3:
-						blender_tface.uv4 = surf.uv_refs[3]
-
-					surf_material = me.materials[self.face_mat_list[i]]
-					blender_tface.image = surf_material.texture_slots[0].texture.image
-
-#						uv_tex.data[f_index].use_image = True
-
+							for vert_index in range(len(surf.uv_refs)):
+								uvtexdata[uv_pointer+vert_index].uv = surf.uv_refs[vert_index]
+							if len(self.tex_name):
+								# we do the check here to allow for import of UV without texture
+								surf_material = me.materials[self.face_mat_list[i]]
+								uvtex.data[i].image = surf_material.texture_slots[0].texture.image
+							uv_pointer += len(surf.uv_refs)
+			
 			me.show_double_sided = two_sided_lighting
-			
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
@@ -532,45 +444,8 @@ class AcObj:
 #			me.calc_normals()
 			me.validate()
 			me.update(calc_edges=True)
-			# remove the now extra vertex in slot 0
-			bpy.ops.object.mode_set(mode = 'EDIT')
-			bpy.ops.mesh.select_all(action = 'DESELECT')
-			bpy.ops.object.mode_set(mode = 'OBJECT')
-			me.vertices[0].select = True
-			bpy.ops.object.mode_set(mode = 'EDIT')
-			bpy.ops.mesh.delete()
-			bpy.ops.object.editmode_toggle()
 
 
-class AcSurfNgon:
-	def __init__(self, flags, mat_index, refs, uv_refs, import_config):
-		self.flags = flags			# surface flags
-		self.mat_index = mat_index				# default material
-		self.refs = refs				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
-		self.uv_refs = uv_refs
-		self.import_config = import_config
-
-	def get_faces(self):
-		# convert refs and surface type to faces
-		surf_faces = []
-		# make sure it's a face type polygon and that there's the right number of vertices
-		if self.flags.type == 0 and len(self.refs) in [3,4]:
-			surf_faces = self.refs
-		return surf_faces
-
-	def get_edges(self):
-		# convert refs and surface type to edges
-		surf_edges = []
-		if self.flags.type != 0:
-			# poly-line
-			for x in range(len(self.refs)-1):
-				surf_edges.append([self.refs[x],self.refs[x+1]])
-
-			if self.flags.type == 1:
-				# closed poly-line
-				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
-		return surf_edges
-		
 class AcSurf:
 	class AcSurfFlags:
 		def __init__(self, flags):
@@ -633,7 +508,7 @@ class AcSurf:
 		# convert refs and surface type to faces
 		surf_faces = []
 		# make sure it's a face type polygon and that there's the right number of vertices
-		if self.flags.type == 0 and len(self.refs) in [3,4]:
+		if self.flags.type == 0 and len(self.refs) > 2:
 			surf_faces = self.refs
 		return surf_faces
 
@@ -642,8 +517,9 @@ class AcSurf:
 		surf_edges = []
 		if self.flags.type != 0:
 			# poly-line
-			for x in range(len(self.refs)-1):
-				surf_edges.append([self.refs[x], self.refs[x+1]])
+			mainline = []
+			mainline.extend(self.refs)
+			surf_edges.append(mainline)
 
 			if self.flags.type == 1:
 				# closed poly-line
