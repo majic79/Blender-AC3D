@@ -144,14 +144,14 @@ class Poly (Object):
 
 		for mod in self.bl_obj.modifiers:
 			if mod.type=='EDGE_SPLIT':
-				self.crease = degrees(mod.split_angle)
+				self.crease = round(degrees(mod.split_angle), 3)
 				break
 
 		if not self.crease:
 			if mesh.use_auto_smooth:
-				self.crease = degrees(mesh.auto_smooth_angle)
+				self.crease = round(degrees(mesh.auto_smooth_angle), 3)
 			else:
-				self.crease = degrees(self.export_config.crease_angle)
+				self.crease = round(degrees(self.export_config.crease_angle), 3)
 
 		#bpy.data.meshes.remove(mesh)
 		
