@@ -77,10 +77,22 @@ class AcMat:
 		bl_mat.specular_shader = 'PHONG'
 		bl_mat.diffuse_color = self.rgb
 		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+		if self.import_config.use_amb_as_mircol:
+				bl_mat.mirror_color = self.amb
 		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+		if self.import_config.use_emis_as_mircol:
+				bl_mat.mirror_color = self.emis
 		bl_mat.specular_color = self.spec
 		bl_mat.specular_intensity = 1.0
-		bl_mat.specular_hardness = int(float(self.shi) * 511.0/128.0)
+
+		acMin = 0.0
+		acMax = 128.0
+		blMin = 1.0
+		blMax = 511.0
+		acRange = (acMax - acMin)  
+		blRange = (blMax - blMin)  
+		bl_mat.specular_hardness = int(round((((float(self.shi) - acMin) * blRange) / acRange) + blMin, 0))
+
 		bl_mat.alpha = 1.0 - self.trans
 		if bl_mat.alpha < 1.0:
 			bl_mat.use_transparency = self.import_config.use_transparency
