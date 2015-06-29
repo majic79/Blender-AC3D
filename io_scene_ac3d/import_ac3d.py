@@ -189,7 +189,7 @@ class AcObj:
 		self.location = [0,0,0]			# translation location of the center relative to the parent object
 		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))	# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
-		self.crease = 30			# crease angle for smoothing
+		self.crease = 61			# crease angle for smoothing
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
