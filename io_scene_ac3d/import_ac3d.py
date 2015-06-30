@@ -77,10 +77,22 @@ class AcMat:
 		bl_mat.specular_shader = 'PHONG'
 		bl_mat.diffuse_color = self.rgb
 		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
+		if self.import_config.use_amb_as_mircol:
+				bl_mat.mirror_color = self.amb
 		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+		if self.import_config.use_emis_as_mircol:
+				bl_mat.mirror_color = self.emis
 		bl_mat.specular_color = self.spec
 		bl_mat.specular_intensity = 1.0
-		bl_mat.specular_hardness = int(float(self.shi) * 511.0/128.0)
+
+		acMin = 0.0
+		acMax = 128.0
+		blMin = 1.0
+		blMax = 511.0
+		acRange = (acMax - acMin)  
+		blRange = (blMax - blMin)  
+		bl_mat.specular_hardness = int(round((((float(self.shi) - acMin) * blRange) / acRange) + blMin, 0))
+
 		bl_mat.alpha = 1.0 - self.trans
 		if bl_mat.alpha < 1.0:
 			bl_mat.use_transparency = self.import_config.use_transparency
@@ -91,7 +103,7 @@ class AcMat:
 	'''
 	looks for a matching blender material (optionally with a texture), adds it if it doesn't exist
 	'''
-	def get_blender_material(self, tex_name=''):
+	def get_blender_material(self, texrep, tex_name=''):
 		bl_mat = None
 		tex_slot = None
 		if tex_name == '':
@@ -102,8 +114,8 @@ class AcMat:
 
 				self.bl_material = bl_mat
 		else:
-			if tex_name in self.bmat_keys:
-				bl_mat = self.bmat_keys[tex_name]
+			if (tex_name+str(texrep[0])+'-'+str(texrep[1])) in self.bmat_keys:
+				bl_mat = self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])]
 			else:
 				bl_mat = bpy.data.materials.new(self.name)
 				bl_mat = self.make_blender_mat(bl_mat)
@@ -111,13 +123,15 @@ class AcMat:
 				bl_mat.use_face_texture_alpha = True
 				
 				tex_slot = bl_mat.texture_slots.add()
-				tex_slot.texture = self.get_blender_texture(tex_name)
+				tex_slot.texture = self.get_blender_texture(tex_name, texrep)
 				tex_slot.texture_coords = 'UV'
 				tex_slot.alpha_factor = 1.0
 				tex_slot.use_map_alpha = True
 				tex_slot.use = True
 				tex_slot.uv_layer = 'UVMap'
-				self.bmat_keys[tex_name] = bl_mat
+				tex_slot.texture.repeat_x = texrep[0]
+				tex_slot.texture.repeat_y = texrep[1]
+				self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])] = bl_mat
 		return bl_mat
 
 	'''
@@ -149,9 +163,9 @@ class AcMat:
 	'''
 	looks for the blender texture, adds it if it doesn't exist
 	'''
-	def get_blender_texture(self, tex_name):
+	def get_blender_texture(self, tex_name, texrep):
 		bl_tex = None
-		if tex_name in bpy.data.textures:
+		if tex_name in bpy.data.textures and bpy.data.textures[tex_name].repeat_x == texrep[0] and bpy.data.textures[tex_name].repeat_y == texrep[1]:
 			bl_tex = bpy.data.textures[tex_name]
 		else:
 			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
@@ -175,10 +189,11 @@ class AcObj:
 		self.location = [0,0,0]			# translation location of the center relative to the parent object
 		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))	# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
-		self.crease = 30			# crease angle for smoothing
+		self.crease = 61			# crease angle for smoothing
 		self.vert_list = []				# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
+		self.surf_face_list = []    # list of surfs that is faces, no edges
 		self.edge_list = []			# spare edge list (handles poly lines etc)
 		self.face_mat_list = []		# flattened surface material index list
 		self.children = []			
@@ -238,29 +253,10 @@ class AcObj:
 			line = line.strip().split()
 			if line[0] == 'SURF':
 				surf = AcSurf(line[1], ac_file, self.import_config)
-				if( len(surf.refs) in [3,4] ):
+				if( surf.flags.type != 0 or len(surf.refs) > 2):
 					self.surf_list.append(surf)
 				else:
-					if(len(surf.refs) > 4):
-						print(surf.refs)
-						tess = ngon_tessellate(self.vert_list, surf.refs)
-						print(tess)
-						for triangle in tess:
-							new_triangle = []
-							for tri_index in triangle:
-								new_triangle.append(surf.refs[tri_index])
-							uv_rfs = []
-							
-							for ref_index in new_triangle:
-								for i, uv_indx in enumerate(surf.uv_refs):
-									uv_rf = surf.refs[i]
-									if(uv_rf == ref_index):
-										uv_rfs.append(uv_indx)
-
-							subsurf = AcSurfNgon(surf.flags, surf.mat_index, new_triangle, uv_rfs, surf.import_config)
-							self.surf_list.append(subsurf)
-					else:
-						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
+					TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))					
 
 	def read_name(self, ac_file, toks):
 		self.name=toks[1].strip('"')
@@ -290,7 +286,8 @@ class AcObj:
 		return False
 
 	def read_texrep(self, ac_file, toks):
-		self.texrep=toks[1:2]
+		self.texrep[0]=int(float(toks[1]))
+		self.texrep[1]=int(float(toks[2]))
 		return False
 
 	def read_texoff(self, ac_file, toks):
@@ -332,7 +329,7 @@ class AcObj:
 			self.bl_obj = bpy.data.objects.new(self.name, None)
 
 		if self.type == 'poly':
-			meshname = self.name
+			meshname = self.name+".mesh"
 			if len(self.data)>0:
 				meshname = self.data
 			me = bpy.data.meshes.new(meshname)
@@ -347,25 +344,32 @@ class AcObj:
 
 			me.use_auto_smooth = self.import_config.use_auto_smooth
 			me.auto_smooth_angle = radians(self.crease)
-			
+			two_sided_lighting = False
+			has_uv = False
 			for surf in self.surf_list:
 				surf_edges = surf.get_edges()
 				surf_face = surf.get_faces()
-				for edge in surf_edges:
-					self.edge_list.append(edge)
+
+				for line in surf_edges:
+					self.edge_list.append(line)
 
 				if surf.flags.type == 0:
 					# test for invalid face (ie, >4 vertices)
-					if len(surf.refs) > 4 or len(surf.refs) < 3:
+					if len(surf.refs) < 3:
 						# not bringing in faces (assumed that there are none in a poly-line)
 						TRACE("Ignoring surface (vertex-count: {0})".format(len(surf.refs)))
 					else:
+						# If one surface is twosided, they all will be...
+						two_sided_lighting |= surf.flags.two_sided
+
+						has_uv |= len(surf.uv_refs) > 0
 
 						self.face_list.append(surf_face)
+						self.surf_face_list.append(surf)
 						
 						# Material index is 1 based, the list we built is 0 based
 						ac_material = ac_matlist[surf.mat_index]
-						bl_material = ac_material.get_blender_material(self.tex_name)
+						bl_material = ac_material.get_blender_material(self.texrep, self.tex_name)
 
 						if bl_material == None:
 							TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
@@ -387,54 +391,37 @@ class AcObj:
 					# treating as a polyline (nothing more to do)
 					pass
 
-			me.vertices.add(len(self.vert_list))
-			me.tessfaces.add(len(self.face_list))
+			me.from_pydata(self.vert_list, self.edge_list, self.face_list);
+
+			y=0	
+			for no, poly in enumerate(me.polygons):
+				if self.surf_face_list[no].flags.shaded == True:
+					poly.use_smooth = True
+				else:
+					poly.use_smooth = False
+				y= y+1			
+
 			
-			# verts_loc is a list of (x, y, z) tuples
-			me.vertices.foreach_set("co", unpack_list(self.vert_list))
+			if has_uv:
+				uvtex = me.uv_textures.new()
+				if uvtex:
+					uvtexdata = me.uv_layers.active.data[:]
+					
+					uv_pointer = 0
+					for i, face in enumerate(self.face_list):
+						surf = self.surf_face_list[i]
+						
+						if len(surf.uv_refs) >= 3:
+
+							for vert_index in range(len(surf.uv_refs)):
+								uvtexdata[uv_pointer+vert_index].uv = surf.uv_refs[vert_index]
+							if len(self.tex_name):
+								# we do the check here to allow for import of UV without texture
+								surf_material = me.materials[self.face_mat_list[i]]
+								uvtex.data[i].image = surf_material.texture_slots[0].texture.image
+							uv_pointer += len(surf.uv_refs)
 			
-			# faces is a list of (vert_indices, texco_indices, ...) tuples
-			me.tessfaces.foreach_set("vertices_raw", unpack_face_list(self.face_list))
-				
-#			face_mat = [m for m in self.face_mat_list]
-#			me.tessfaces.foreach_set("material_index", face_mat)
-#			del face_mat
-				
-			if len(self.tex_name):
-				me.tessface_uv_textures.new()
-#				uv_tex.active = True
-#				uv_tex.active_render = True
-			else:
-				uv_tex = None
-				
-			two_sided_lighting = False
-				
-			for i, face in enumerate(self.face_list):
-				blender_face = me.tessfaces[i]
-				surf = self.surf_list[i]
-				
-				blender_face.use_smooth = surf.flags.shaded
-
-				# If one surface is twosided, they all will be...
-				two_sided_lighting |= surf.flags.two_sided
-
-				if len(self.tex_name) and len(surf.uv_refs) >= 3:
-					blender_tface = me.tessface_uv_textures[0].data[i]
-
-					blender_tface.uv1 = surf.uv_refs[0]
-					blender_tface.uv2 = surf.uv_refs[1]
-					blender_tface.uv3 = surf.uv_refs[2]
-
-					if len(surf.uv_refs) > 3:
-						blender_tface.uv4 = surf.uv_refs[3]
-
-					surf_material = me.materials[self.face_mat_list[i]]
-					blender_tface.image = surf_material.texture_slots[0].texture.image
-
-#						uv_tex.data[f_index].use_image = True
-
 			me.show_double_sided = two_sided_lighting
-			
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
@@ -471,35 +458,6 @@ class AcObj:
 			me.update(calc_edges=True)
 
 
-class AcSurfNgon:
-	def __init__(self, flags, mat_index, refs, uv_refs, import_config):
-		self.flags = flags			# surface flags
-		self.mat_index = mat_index				# default material
-		self.refs = refs				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
-		self.uv_refs = uv_refs
-		self.import_config = import_config
-
-	def get_faces(self):
-		# convert refs and surface type to faces
-		surf_faces = []
-		# make sure it's a face type polygon and that there's the right number of vertices
-		if self.flags.type == 0 and len(self.refs) in [3,4]:
-			surf_faces = self.refs
-		return surf_faces
-
-	def get_edges(self):
-		# convert refs and surface type to edges
-		surf_edges = []
-		if self.flags.type != 0:
-			# poly-line
-			for x in range(len(self.refs)-1):
-				surf_edges.append([self.refs[x],self.refs[x+1]])
-
-			if self.flags.type == 1:
-				# closed poly-line
-				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
-		return surf_edges
-		
 class AcSurf:
 	class AcSurfFlags:
 		def __init__(self, flags):
@@ -562,7 +520,7 @@ class AcSurf:
 		# convert refs and surface type to faces
 		surf_faces = []
 		# make sure it's a face type polygon and that there's the right number of vertices
-		if self.flags.type == 0 and len(self.refs) in [3,4]:
+		if self.flags.type == 0 and len(self.refs) > 2:
 			surf_faces = self.refs
 		return surf_faces
 
@@ -571,12 +529,13 @@ class AcSurf:
 		surf_edges = []
 		if self.flags.type != 0:
 			# poly-line
-			for x in range(len(self.refs)-1):
-				surf_edges.append([self.refs[x],self.refs[x+1]])
+			mainline = []
+			mainline.extend(self.refs)
+			surf_edges.append(mainline)
 
 			if self.flags.type == 1:
 				# closed poly-line
-				surf_edges.append([self.refs[len(self.refs)-1],self.refs[0]])
+				surf_edges.append([self.refs[len(self.refs)-1], self.refs[0]])
 		return surf_edges
 
 class ImportConf:
