@@ -129,8 +129,8 @@ class AcMat:
 				tex_slot.use_map_alpha = True
 				tex_slot.use = True
 				tex_slot.uv_layer = 'UVMap'
-				tex_slot.texture.repeat_x = texrep[0]
-				tex_slot.texture.repeat_y = texrep[1]
+				tex_slot.texture.repeat_x = 1#texrep[0]
+				tex_slot.texture.repeat_y = 1#texrep[1]
 				self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])] = bl_mat
 		return bl_mat
 
@@ -165,7 +165,7 @@ class AcMat:
 	'''
 	def get_blender_texture(self, tex_name, texrep):
 		bl_tex = None
-		if tex_name in bpy.data.textures and bpy.data.textures[tex_name].repeat_x == texrep[0] and bpy.data.textures[tex_name].repeat_y == texrep[1]:
+		if tex_name in bpy.data.textures:# and bpy.data.textures[tex_name].repeat_x == texrep[0] and bpy.data.textures[tex_name].repeat_y == texrep[1]:
 			bl_tex = bpy.data.textures[tex_name]
 		else:
 			bl_tex = bpy.data.textures.new(tex_name, 'IMAGE')
@@ -178,7 +178,7 @@ class AcObj:
 	'''
 	Container class for a .ac OBJECT
 	'''
-	def __init__(self, ob_type, ac_file, import_config, parent = None):
+	def __init__(self, ob_type, ac_file, import_config, world, parent = None):
 		self.type = ob_type			# Type of object
 		self.ac_parent = parent		# reference to the parent object (if the object is World, then this should be None)
 		self.name = ''				# name of the object
@@ -198,7 +198,7 @@ class AcObj:
 		self.face_mat_list = []		# flattened surface material index list
 		self.children = []			
 		self.bl_mat_dict = {}		# Dictionary of ac_material index/texture pair to blender mesh material index
-
+		self.world = world
 		self.bl_obj = None			# Blender object
 		self.import_config = import_config
 
@@ -219,14 +219,15 @@ class AcObj:
 
 		self.read_ac_object(ac_file)
 
+
 	'''
 	Read the object lines and dump them into this object, making hierarchial attachments to parents
 	'''
 	def read_ac_object(self, ac_file):
 		bDone = False
 		while not bDone:
-			line = ac_file.readline()
-			if line == '':
+			line = self.world.readLine(ac_file)
+			if line == None:
 				break
 			toks = line.strip().split()
 			if len(toks)>0:
@@ -238,21 +239,24 @@ class AcObj:
 	def read_vertices(self, ac_file, toks):
 		vertex_count = int(toks[1])
 		for n in range(vertex_count):
-			line = ac_file.readline()
+			line = self.world.readLine(ac_file)
 			line = line.strip().split()
-			self.vert_list.append(self.import_config.global_matrix * Vector([float(x) for x in line]))
+			if len(line) > 2:
+				self.vert_list.append(self.import_config.global_matrix * Vector([float(x) for x in line]))
+			else:
+				self.readPrevious = True
+				break
 
 	def read_surfaces(self, ac_file, toks):
 		surf_count = int(toks[1])
 
 		for n in range(surf_count):
-			line = ac_file.readline()
-			if line=='':
+			line = self.world.readLine(ac_file)
+			if line == None:
 				break
-
 			line = line.strip().split()
 			if line[0] == 'SURF':
-				surf = AcSurf(line[1], ac_file, self.import_config)
+				surf = AcSurf(line[1], ac_file, self.import_config, self.world)
 				if( surf.flags.type != 0 or len(surf.refs) > 2):
 					self.surf_list.append(surf)
 				else:
@@ -263,7 +267,7 @@ class AcObj:
 		return False
 
 	def read_data(self, ac_file, toks):
-		line = ac_file.readline()
+		line = self.world.readLine(ac_file)
 		self.data=line[:int(toks[1])]
 		return False
 
@@ -286,12 +290,12 @@ class AcObj:
 		return False
 
 	def read_texrep(self, ac_file, toks):
-		self.texrep[0]=int(float(toks[1]))
-		self.texrep[1]=int(float(toks[2]))
+		self.texrep[0]=float(toks[1])
+		self.texrep[1]=float(toks[2])
 		return False
 
 	def read_texoff(self, ac_file, toks):
-		self.texoff=toks[1:2]
+		self.texoff=[float(toks[1]),float(toks[2])]
 		return False
 
 	def read_subdiv(self, ac_file, toks):
@@ -305,11 +309,15 @@ class AcObj:
 	def read_children(self, ac_file, toks):
 		num_kids = int(toks[1])
 		for n in range(num_kids):
-			line = ac_file.readline()
-			if line == '':
-				break			
+			line = self.world.readLine(ac_file)
+			if line == None:
+				break
 			line = line.strip().split()
-			self.children.append(AcObj(line[1].strip('"'), ac_file, self.import_config, self))
+			if len(line) > 1:
+				self.children.append(AcObj(line[1].strip('"'), ac_file, self.import_config, self.world, self))
+			else:
+				self.readPrevious = True
+				break
 		# This is assumed to be the last thing in the list of things to read
 		# returning True indicates to cease parsing this object
 		return True
@@ -414,13 +422,13 @@ class AcObj:
 						if len(surf.uv_refs) >= 3:
 
 							for vert_index in range(len(surf.uv_refs)):
-								uvtexdata[uv_pointer+vert_index].uv = surf.uv_refs[vert_index]
+								uvtexdata[uv_pointer+vert_index].uv = [surf.uv_refs[vert_index][0]*self.texrep[0]+self.texoff[0], surf.uv_refs[vert_index][1]*self.texrep[1]+self.texoff[1]]
 							if len(self.tex_name):
 								# we do the check here to allow for import of UV without texture
 								surf_material = me.materials[self.face_mat_list[i]]
 								uvtex.data[i].image = surf_material.texture_slots[0].texture.image
 							uv_pointer += len(surf.uv_refs)
-			
+						
 			me.show_double_sided = two_sided_lighting
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
@@ -476,7 +484,7 @@ class AcSurf:
 	'''
 	Container class for surface definition within a parent object
 	'''
-	def __init__(self, flags, ac_file, import_config):
+	def __init__(self, flags, ac_file, import_config, world):
 		self.flags = self.AcSurfFlags(flags)			# surface flags
 		self.mat_index = 0				# default material
 		self.refs = []				# list of indexes into the parent objects defined vertexes with defined UV coordinates 
@@ -487,13 +495,14 @@ class AcSurf:
 						}
 
 		self.import_config = import_config
+		self.world = world
 		self.read_ac_surfaces(ac_file)
 
 	def read_ac_surfaces(self, ac_file):
 		surf_done=False
 		while not surf_done:
-			line = ac_file.readline()
-			if line=='':
+			line = self.world.readLine(ac_file)
+			if line == None:
 				break
 			toks = line.split()
 			if len(toks)>0:
@@ -509,7 +518,7 @@ class AcSurf:
 	def read_surf_refs(self, ac_file, tokens):
 		num_refs = int(tokens[1])
 		for n in range(num_refs):
-			line = ac_file.readline()
+			line = self.world.readLine(ac_file)
 			line = line.strip().split()
 		
 			self.refs.append(int(line[0]))
@@ -608,14 +617,27 @@ class ImportAC3D:
 						}
 		self.oblist = []
 		self.matlist = []
+		self.lastline = ''          # last read line of the file, stored incase we have to reread it, due to bad AC file
+		self.readPrevious = False   # should last line be reread instead of next line
+		self.line_num = 0
 
 		operator.report({'INFO'}, "Attempting import: {file}".format(file=filepath))
 
 		# Check to make sure we're working with a valid AC3D file
 		ac_file = open(filepath, 'r')
-		self.header = ac_file.readline().strip()
+
+		condition = True
+		while condition:
+			self.header = ac_file.readline()
+			if not self.header:
+				self.header = ''
+				break
+			if self.header != '':
+				condition = False
+
+		self.header = self.header.strip()
 		if len(self.header) != 5:
-			operator.report({'ERROR'},"Invalid file header length: {0}".format(self.header))
+			operator.report({'ERROR'},"Invalid file header length {0}: '{1}'".format(len(self.header), self.header))
 			ac_file.close()
 			return None
 
@@ -644,6 +666,30 @@ class ImportAC3D:
 		return None
 
 	'''
+	Read a line from the AC file
+	'''
+	def readLine(self, ac_file):
+		if self.readPrevious == False:
+			condition = True
+			while condition:
+				# keep reading lines until we encounter a non-empty line
+				line = ac_file.readline()
+				if not line:
+					# end of file
+					return None
+				line = line.rstrip("\n")
+				if line.strip != '' and len(line.split()) > 0:
+					condition = False
+					self.lastline = line
+					#print("lastline="+self.lastline)			
+				self.line_num = self.line_num + 1
+			return line
+		else:
+			#print("Reading "+str(len(self.lastline))+" prev:"+self.lastline)
+			self.readPrevious = False
+			self.line_num = self.line_num + 1
+			return self.lastline
+	'''
 	Simplifies the reporting of errors to the user
 	'''
 	def report_error(self, message):
@@ -654,16 +700,23 @@ class ImportAC3D:
 	read our validated .ac file
 	'''
 	def read_ac_file(self, ac_file):
-		reader = csv.reader(ac_file, delimiter=' ', skipinitialspace=True)
 		try:
-			for row in reader:
-				# See if this is a valid token and pass the file handle and the current line to our function
-				if row[0] in self.tokens.keys():
-					self.tokens[row[0]](ac_file,row)
+			condition = True
+			while condition:
+				line = self.readLine(ac_file)
+				if line != None:
+					line = line.strip()
+					line = line.split()
+				
+					# See if this is a valid token and pass the file handle and the current line to our function
+					if line[0] in self.tokens.keys():
+						self.tokens[line[0]](ac_file,line)
+					else:
+						self.report_error("invalid token: {tok} ({ln})".format(tok=line[0], ln=line))
 				else:
-					self.report_error("invalid token: {tok} ({ln})".format(tok=row[0], ln=row))				
-		except csv.Error(e):
-			self.report_error('AC3D import error, line %d: %s' % (reader.line_num, e))
+					condition = False
+		except Error(e):
+			self.report_error('AC3D import error, line %d: %s' % (self.line_num, e))
 
 	'''
 	Take the passed in line and interpret as a .ac material
@@ -686,7 +739,7 @@ class ImportAC3D:
 	'''
 	def read_object(self, ac_file, line):
 		# OBJECT %s
-		self.oblist.append(AcObj(line[1], ac_file, self.import_config))
+		self.oblist.append(AcObj(line[1], ac_file, self.import_config, self))
 
 	'''
 	Reads the data imported from the file and creates blender data
