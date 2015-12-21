@@ -448,7 +448,23 @@ class Material:
 						self._feq(self.spec[2], rhs.spec[2]) and \
 						self._feq(self.shi, rhs.shi) and \
 						self._feq(self.trans, rhs.trans)
-		return self.name == rhs.name
+		# when not merging we still have to check the values since the char " has been removed from names.
+		# for example there might have been a name called fuselageMat and a name "fuselage"Mat. They will seem similar if not checking the values.
+		return self._feq(self.rgb[0], rhs.rgb[0]) and \
+						self._feq(self.rgb[1], rhs.rgb[1]) and \
+						self._feq(self.rgb[2], rhs.rgb[2]) and \
+						self._feq(self.amb[0], rhs.amb[0]) and \
+						self._feq(self.amb[1], rhs.amb[1]) and \
+						self._feq(self.amb[2], rhs.amb[2]) and \
+						self._feq(self.emis[0], rhs.emis[0]) and \
+						self._feq(self.emis[1], rhs.emis[1]) and \
+						self._feq(self.emis[2], rhs.emis[2]) and \
+						self._feq(self.spec[0], rhs.spec[0]) and \
+						self._feq(self.spec[1], rhs.spec[1]) and \
+						self._feq(self.spec[2], rhs.spec[2]) and \
+						self._feq(self.shi, rhs.shi) and \
+						self._feq(self.trans, rhs.trans) and \
+						self.name == rhs.name
 		
 	def _feq(self, lhs, rhs):
 		return abs(rhs - lhs) < 0.0001
