@@ -33,8 +33,8 @@ from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
 bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "AC3D model exporter for blender.",
-	"author": "Chris Marr",
-	"version": (2,0),
+	"author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr.",
+	"version": (2,2),
 	"blender" : (2,6,0),
 	"api": 41098,
 	"location": "File > Import-Export",
@@ -130,7 +130,7 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 	use_emis_as_mircol = BoolProperty(
 							name="Use Emis as Mirror colour",
 							description="Use Emission colour as Mirror colour",
-							default=True,
+							default=False,
 						)
 
 	use_amb_as_mircol = BoolProperty(
@@ -225,10 +225,15 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 #							description="Transform all vertices of all meshes to global coordinates",
 #							default=False,
 #							)
+	merge_materials = BoolProperty(
+							name="Merge materials",
+							description="merge materials that are identical",
+							default=True,
+							)
 	mircol_as_emis = BoolProperty(
 							name="Mirror col as Emis",
 							description="export mirror colour as emissive colour",
-							default=True,
+							default=False,
 							)
 	mircol_as_amb = BoolProperty(
 							name="Mirror col as Amb",

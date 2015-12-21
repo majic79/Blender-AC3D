@@ -51,6 +51,7 @@ class ExportConf:
 			use_render_layers,
 			skip_data,
 			global_coords,
+			merge_materials,
 			mircol_as_emis,
 			mircol_as_amb,
 			crease_angle,
@@ -66,6 +67,7 @@ class ExportConf:
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
 		self.crease_angle = crease_angle
+		self.merge_materials = merge_materials
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -83,6 +85,7 @@ class ExportAC3D:
 			use_render_layers=True,
 			skip_data=False,
 			global_coords=False,
+			merge_materials=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
 			crease_angle=radians(35.0),
@@ -97,9 +100,10 @@ class ExportAC3D:
 										use_render_layers,
 										skip_data,
 										global_coords,
+										merge_materials,
 										mircol_as_emis,
 										mircol_as_amb,
-										crease_angle,
+										crease_angle,										
 										)
 
 			#TRACE("Global: {0}".format(global_matrix))

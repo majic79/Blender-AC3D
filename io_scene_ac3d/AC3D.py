@@ -1,4 +1,4 @@
-import bpy, os, shutil
+import bpy, os, shutil, re
 from math import radians, degrees
 from mathutils import Vector, Matrix
 
@@ -201,7 +201,7 @@ class Poly (Object):
 						
 						self.tex_name = tex_name
 						try:
-							self.tex_rep = [tex_slot.texture.repeat_x, tex_slot.texture.repeat_y]
+							self.tex_rep = [1, 1] #[tex_slot.texture.repeat_x, tex_slot.texture.repeat_y] this is not the same as blender texture repeat!
 						except:
 							print("Failed to export texrep")
 						break
@@ -390,9 +390,10 @@ class Material:
 		self.spec = [0.5, 0.5, 0.5]			# [R,G,B]
 		self.shi = 10										# integer
 		self.trans = 0									# float
+		self.merge = False
 
 		if bl_mat:
-			self.name = bl_mat.name
+			self.name = re.sub('["]', '', bl_mat.name) # remove any " from the name.
 			self.rgb = bl_mat.diffuse_color
 			if export_config.mircol_as_amb:
 				self.amb = bl_mat.mirror_color
@@ -403,6 +404,7 @@ class Material:
 			else:
 				self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
 			self.spec = bl_mat.specular_intensity * bl_mat.specular_color   
+			self.merge = export_config.merge_materials
 
 			acMin = 0.0
 			acMax = 128.0
@@ -431,7 +433,8 @@ class Material:
 							))
 
 	def same_as( self, rhs ):
-		return  self._feq(self.rgb[0], rhs.rgb[0]) and \
+		if self.merge:
+			return  self._feq(self.rgb[0], rhs.rgb[0]) and \
 						self._feq(self.rgb[1], rhs.rgb[1]) and \
 						self._feq(self.rgb[2], rhs.rgb[2]) and \
 						self._feq(self.amb[0], rhs.amb[0]) and \
@@ -445,6 +448,7 @@ class Material:
 						self._feq(self.spec[2], rhs.spec[2]) and \
 						self._feq(self.shi, rhs.shi) and \
 						self._feq(self.trans, rhs.trans)
+		return self.name == rhs.name
 		
 	def _feq(self, lhs, rhs):
 		return abs(rhs - lhs) < 0.0001
