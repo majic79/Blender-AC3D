@@ -18,6 +18,9 @@ You'll need to enable the script in the user preferences window after installing
 Uh, I've done all that how do I use it?
 Go to File->Import->AC3D (.ac), select a file and let it do the work
 
+Why is export/import mirror color as emissive not longer checked by default?
+In latest Blender versions mirror color is white per default, and that confused many users that what they exported would get totally emissive per default.
+
 Known Issues:
 
  - Exporter:
