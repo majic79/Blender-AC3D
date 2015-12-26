@@ -23,6 +23,7 @@ import struct
 import bpy
 import csv
 import mathutils
+import re
 from mathutils import Vector, Euler
 from math import radians
 from bpy import *
@@ -60,7 +61,7 @@ class AcMat:
 	def __init__(self, name, rgb, amb, emis, spec, shi, trans, import_config):
 		if name == "":
 			name = "Default"
-		self.name = name			# string
+		self.name = re.sub('["]', '', name)	# string
 		self.rgb = rgb				# [R,G,B]
 		self.amb = amb				# [R,G,B]
 		self.emis = emis			# [R,G,B]
@@ -131,6 +132,7 @@ class AcMat:
 				tex_slot.uv_layer = 'UVMap'
 				tex_slot.texture.repeat_x = 1#texrep[0]
 				tex_slot.texture.repeat_y = 1#texrep[1]
+				tex_slot.blend_type = 'MULTIPLY'
 				self.bmat_keys[tex_name+str(texrep[0])+'-'+str(texrep[1])] = bl_mat
 		return bl_mat
 
@@ -389,7 +391,7 @@ class AcObj:
 						else:
 							for mat in me.materials:
 								if mat == bl_material:
-									continue
+									break
 								fm_index += 1
 							if fm_index > len(me.materials):
 								TRACE("Failed to find material index")
@@ -401,6 +403,7 @@ class AcObj:
 
 			me.from_pydata(self.vert_list, self.edge_list, self.face_list);
 
+			# set smooth flag on each face
 			y=0	
 			for no, poly in enumerate(me.polygons):
 				if self.surf_face_list[no].flags.shaded == True:
@@ -409,7 +412,11 @@ class AcObj:
 					poly.use_smooth = False
 				y= y+1			
 
-			
+			# apply material to each face
+			for i, face in enumerate(self.face_list):
+				me.polygons[i].material_index = self.face_mat_list[i]
+
+			# apply UV map
 			if has_uv:
 				uvtex = me.uv_textures.new()
 				if uvtex:
@@ -426,9 +433,10 @@ class AcObj:
 							if len(self.tex_name):
 								# we do the check here to allow for import of UV without texture
 								surf_material = me.materials[self.face_mat_list[i]]
+								
 								uvtex.data[i].image = surf_material.texture_slots[0].texture.image
 							uv_pointer += len(surf.uv_refs)
-						
+
 			me.show_double_sided = two_sided_lighting
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
