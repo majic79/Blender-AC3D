@@ -276,9 +276,10 @@ class Poly (Object):
 		if len(self.vertices):
 			strm.write('numvert {0}\n'.format(len(self.vertices)))
 			for vert in self.vertices:
-				strm.write('{0:.7f} {1:.7f} {2:.7f}\n'.format( vert[0],
-																											 vert[1],
-																											 vert[2] ))
+				x = round(vert[0],5)
+				y = round(vert[1],5)
+				z = round(vert[2],5)
+				strm.write('{0:.5f} {1:.5f} {2:.5f}\n'.format(x, y, z))
 
 		if len(self.surfaces):
 			strm.write('numsurf {0}\n'.format(len(self.surfaces)))
