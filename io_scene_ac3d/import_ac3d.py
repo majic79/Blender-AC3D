@@ -403,18 +403,13 @@ class AcObj:
 
 			me.from_pydata(self.vert_list, self.edge_list, self.face_list);
 
-			# set smooth flag on each face
-			y=0	
+			# set smooth flag and apply material to each face
 			for no, poly in enumerate(me.polygons):
+				poly.material_index = self.face_mat_list[no]
 				if self.surf_face_list[no].flags.shaded == True:
 					poly.use_smooth = True
 				else:
 					poly.use_smooth = False
-				y= y+1			
-
-			# apply material to each face
-			for i, face in enumerate(self.face_list):
-				me.polygons[i].material_index = self.face_mat_list[i]
 
 			# apply UV map
 			if has_uv:
