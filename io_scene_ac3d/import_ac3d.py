@@ -216,7 +216,10 @@ class AcObj:
 						'texrep':	self.read_texrep,
 						'texoff':	self.read_texoff,
 						'subdiv':	self.read_subdiv,
-						'crease':	self.read_crease
+						'crease':	self.read_crease,
+						'folded':	self.read_hierarchy_state,
+						'locked':	self.read_hierarchy_state,
+						'hidden':	self.read_hierarchy_state
 						}
 
 		self.read_ac_object(ac_file)
@@ -271,6 +274,9 @@ class AcObj:
 	def read_data(self, ac_file, toks):
 		line = self.world.readLine(ac_file)
 		self.data=line[:int(toks[1])]
+		return False
+
+	def read_hierarchy_state(self, ac_file, toks):
 		return False
 
 	def read_location(self, ac_file, toks):
