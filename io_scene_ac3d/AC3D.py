@@ -323,7 +323,9 @@ class Poly (Object):
 				for n in r:
 					surf_ref = self.bl_face.vertices[n]
 					uv_ref = self.uv_coords[n]
-					ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, uv_ref[0], uv_ref[1]))
+					u = round(uv_ref[0], 6)
+					v = round(uv_ref[1], 6)
+					ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, u, v))
 			else:
 				for n in r:
 					surf_ref = self.bl_face.vertices[n]
