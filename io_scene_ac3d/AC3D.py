@@ -137,7 +137,10 @@ class Poly (Object):
 	
 	def _parseMesh( self, ac_mats ):
 		mesh = self.bl_obj.to_mesh(self.export_config.context.scene, True, 'PREVIEW')
-		
+		orig_mesh = self.bl_obj.data
+		if (orig_mesh):
+			if (orig_mesh.name):
+				self.data = orig_mesh.name.replace('"','') # quotes not allowed...
 		self._parseMaterials(mesh, ac_mats)
 		self._parseVertices(mesh)		
 		self._parseFaces(mesh)		
