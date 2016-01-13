@@ -273,7 +273,12 @@ class AcObj:
 
 	def read_data(self, ac_file, toks):
 		line = self.world.readLine(ac_file)
-		self.data=line[:int(toks[1])]
+		chars = int(toks[1])
+		# Data can be multiline, so keep reading lines until all data is read, but only use data in first line
+		self.data=line[:chars]
+		count = len(line)+1 # +1 is for newline char
+		while (chars > count):
+			count += len(self.world.readLine(ac_file))+1
 		return False
 
 	def read_hierarchy_state(self, ac_file, toks):
