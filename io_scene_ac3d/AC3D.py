@@ -184,6 +184,9 @@ class Poly (Object):
 					if tex_slot and tex_slot.texture_coords == 'UV':
 						bl_tex = tex_slot.texture
 						bl_im = bl_tex.image
+						if(bl_im == None):
+							print("Texture not loaded (skipping): Tex name="+bl_tex.name+" Mat name="+bl_mat.name)
+							#continue
 						tex_name = bpy.path.basename(bl_im.filepath)
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
