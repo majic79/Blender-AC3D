@@ -412,7 +412,7 @@ class AcObj:
 					# treating as a polyline (nothing more to do)
 					pass
 
-			me.from_pydata(self.vert_list, self.edge_list, self.face_list);
+			me.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
 			# set smooth flag and apply material to each face
 			for no, poly in enumerate(me.polygons):

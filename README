@@ -24,7 +24,9 @@ In latest Blender versions mirror color is white per default, and that confused 
 Known Issues:
 
  - Exporter:
-   * Export packed .blend images will make the exporter fail
+   * Export packed .blend images will make the exporter fail.
+ - Importer:
+   * Import will fail if a mesh has only 1 vertex.
 
 Things to come:
 	- I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
