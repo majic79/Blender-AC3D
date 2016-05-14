@@ -177,6 +177,8 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 
 	filename_ext = '.ac'
 
+	v_info = bl_info["version"]
+
 	filter_glob = StringProperty(
 							default='*.ac',
 							options={'HIDDEN'}

@@ -114,7 +114,7 @@ class ExportAC3D:
 			# Parsing the tree in a top down manner and check on the way down which
 			# objects are to be exported
 
-			self.world = AC3D.World('Blender_export__' + bpy.path.basename(filepath), self.export_conf)
+			self.world = AC3D.World('Blender_exporter_v' +str(operator.v_info[0])+"."+str(operator.v_info[1])+"__" + bpy.path.basename(filepath), self.export_conf)
 			self.parseLevel(self.world, [ob for ob in bpy.data.objects if ob.parent == None and not ob.library])
 			self.world.parse(self.ac_mats)
 
