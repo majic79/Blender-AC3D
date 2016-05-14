@@ -411,7 +411,7 @@ class AcObj:
 				else:
 					# treating as a polyline (nothing more to do)
 					pass
-
+			#print(len(self.vert_list))
 			me.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
 			# set smooth flag and apply material to each face
@@ -552,13 +552,21 @@ class AcSurf:
 		surf_edges = []
 		if self.flags.type != 0:
 			# poly-line
-			mainline = []
-			mainline.extend(self.refs)
-			surf_edges.append(mainline)
-
-			if self.flags.type == 1:
-				# closed poly-line
-				surf_edges.append([self.refs[len(self.refs)-1], self.refs[0]])
+			if len(self.refs) == 1:
+				# Its not a line, but a point, so to get Blender to accept that as a line we make that line
+				# have the vertex as both the start and end point.
+				mainline = []
+				mainline.extend(self.refs)
+				mainline.extend(self.refs)
+				surf_edges.append(mainline)
+			else:
+				# its a line
+				for i in range(0, len(self.refs)-1):
+					lineSegment = [self.refs[i],self.refs[i+1]]
+					surf_edges.append(lineSegment)
+				if self.flags.type == 1 and len(self.refs) > 2:
+					# closed poly-line with more than 1 segment
+					surf_edges.append([self.refs[len(self.refs)-1], self.refs[0]])
 		return surf_edges
 
 class ImportConf:
