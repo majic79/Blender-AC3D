@@ -125,6 +125,7 @@ class Poly (Object):
 		self.tex_name = ''    # texture name (filename of texture)
 		self.tex_rep = [1,1]  # texture repeat
 		self.ac_mats = {}     # Blender to AC3d index cross-reference
+		self.ex_conf = export_config
 
 	def _parse( self, ac_mats, str_pre ):
 
@@ -185,8 +186,9 @@ class Poly (Object):
 						bl_tex = tex_slot.texture
 						bl_im = bl_tex.image
 						if(bl_im == None):
-							print("Texture not loaded (skipping): Tex name="+bl_tex.name+" Mat name="+bl_mat.name)
-							#continue
+							print("Texture has no data (skipping): Tex name="+bl_tex.name+" Mat name="+bl_mat.name)
+							self.ex_conf.operator.report({'WARNING'}, 'AC3D Exporter: Texture "'+bl_tex.name+'" in material: "'+bl_mat.name+ '" contains no data and was not exported.')
+							continue
 						tex_name = bpy.path.basename(bl_im.filepath)
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
@@ -203,7 +205,16 @@ class Poly (Object):
 								if not os.path.exists(abs_path):
 									TRACE('Warning: Texture doesn\'t exists: {0}'.format(bl_im.filepath))
 								else:
-									shutil.copy(abs_path, export_tex)
+									if not bl_im.is_dirty:
+										shutil.copy(abs_path, export_tex)
+									else:
+										# To protect original texture, we actually save the modified texture only to the export location.
+										# After exporting, the texture in Blender will point to the old location, but no longer be dirty.
+										# Therefore users should be careful to save the image manually if they want the original to be overwritten.
+										orig_file_path = bl_im.filepath
+										bl_im.filepath_raw = export_tex
+										bl_im.save()
+										bl_im.filepath_raw = orig_file_path
 						# else:
 							# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
 						
