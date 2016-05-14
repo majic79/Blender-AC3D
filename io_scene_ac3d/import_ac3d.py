@@ -159,6 +159,7 @@ class AcMat:
 			
 			if not found:
 				TRACE("Failed to locate texture: {0}".format(tex_name))
+				self.import_config.operator.report({'WARNING'}, 'AC3D Importer: Failed to locate texture: "'+tex_name+'" in material "'+self.name+'".')
 
 		return bl_image
 
