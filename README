@@ -1,4 +1,4 @@
-README for Blender-AC3D - Version 2.5
+README for Blender-AC3D - Version 2.6
 
 What is it?
 It's a few python scripts to import/export AC3D data into and out of Blender 2.63+. For earlier Blender 2.6x versions you need an older revision of the plugin (https://github.com/majic79/Blender-AC3D/tree/BL2.62)
@@ -23,8 +23,6 @@ In latest Blender versions mirror color is white per default, and that confused 
 
 Known Issues:
 
- - Exporter:
-   * Export packed .blend images will make the exporter fail.
  - Importer:
    * Import will fail if a mesh has only 1 vertex.
 
