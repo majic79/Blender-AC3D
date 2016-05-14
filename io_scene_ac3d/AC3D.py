@@ -195,7 +195,9 @@ class Poly (Object):
 							if bl_im.packed_file:
 								bl_im.file_format = 'PNG'
 								bl_im.filepath = export_tex
-								bl_im.unpack('WRITE_LOCAL')
+								bl_im.unpack('WRITE_ORIGINAL')
+								# We cannot repack it after unpacking, as that will remove the newly saved image from the disk:
+								# bl_im.pack(True)
 							else:
 								abs_path = bpy.path.abspath(bl_im.filepath)
 								if not os.path.exists(abs_path):
