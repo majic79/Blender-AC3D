@@ -39,8 +39,8 @@ bl_info = {
 	"api": 41098,
 	"location": "File > Import-Export",
 	"warning": "",
-	"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Import-Export/Blender-AC3D",
-	"tracker_url": "http://projects.blender.org/tracker/index.php?func=detail&aid=29007&group_id=153&atid=468",
+	"wiki_url": "http://wiki.flightgear.org/Blender_AC3D_import_and_export#Majic79_addon",
+	"tracker_url": "https://github.com/NikolaiVChr/Blender-AC3D/issues",
 	"category": "Import-Export"
 }
 
