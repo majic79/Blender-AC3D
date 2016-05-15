@@ -34,7 +34,7 @@ bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "AC3D model exporter for blender.",
 	"author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr.",
-	"version": (2,8),
+	"version": (2,9),
 	"blender" : (2,6,0),
 	"api": 41098,
 	"location": "File > Import-Export",
