@@ -148,6 +148,11 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							description="Show main window with textures applied (transparency works in only in normal direction)",
 							default=False,
 						)
+	hide_hidden_objects = BoolProperty(
+							name="Hide hidden objects",
+							description="Newer AC3D format supports hidding objects. If checked those objects will be Restrict viewport visibility in Blender.",
+							default=False,
+						)
 
 	def execute(self, context):
 		from . import import_ac3d

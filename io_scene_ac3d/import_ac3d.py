@@ -204,6 +204,7 @@ class AcObj:
 		self.world = world
 		self.bl_obj = None			# Blender object
 		self.import_config = import_config
+		self.hidden = False
 
 		self.tokens =	{
 						'numvert':	self.read_vertices,
@@ -284,9 +285,11 @@ class AcObj:
 		return False
 
 	def read_hierarchy_state(self, ac_file, toks):
-		# hidden: Since OSG AC3D loader ignores this token, I have decided to ignore it aswell, need to read it though, in case its there.
+		# hidden: If an object should have restricted viewport visibility.
 		# locked: Blender does not support locking of entire object.
 		# folded: Blender API does not allow access to to this.
+		if toks[0] == "hidden" and self.import_config.hide_hidden_objects == True:
+			self.hidden = True
 		return False
 
 	def read_url(self, ac_file, toks):
@@ -465,6 +468,8 @@ class AcObj:
 # There's a bug somewhere - this ought to work....
 			self.import_config.context.scene.objects.active = self.bl_obj
 #			bpy.ops.object.origin_set('ORIGIN_GEOMETRY', 'MEDIAN')
+			if self.hidden == True:
+				self.bl_obj.hide = True
 			
 
 		TRACE("{0}+-{1} ({2})".format(str_pre, self.name, self.data))
@@ -593,6 +598,7 @@ class ImportConf:
 			use_amb_as_mircol,
 			display_transparency,
 			display_textured_solid,
+			hide_hidden_objects,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
@@ -605,6 +611,7 @@ class ImportConf:
 		self.use_amb_as_mircol = use_amb_as_mircol
 		self.display_transparency = display_transparency
 		self.display_textured_solid = display_textured_solid
+		self.hide_hidden_objects = hide_hidden_objects
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
@@ -626,6 +633,7 @@ class ImportAC3D:
 			use_amb_as_mircol=False,
 			display_transparency=True,
 			display_textured_solid=False,
+			hide_hidden_objects=False,
 			):
 
 		self.import_config = ImportConf(
@@ -640,6 +648,7 @@ class ImportAC3D:
 										use_amb_as_mircol,
 										display_transparency,
 										display_textured_solid,
+										hide_hidden_objects,
 										)
 
 
