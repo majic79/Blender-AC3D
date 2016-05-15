@@ -220,7 +220,8 @@ class AcObj:
 						'crease':	self.read_crease,
 						'folded':	self.read_hierarchy_state,
 						'locked':	self.read_hierarchy_state,
-						'hidden':	self.read_hierarchy_state
+						'hidden':	self.read_hierarchy_state,
+						'url':      self.read_url
 						}
 
 		self.read_ac_object(ac_file)
@@ -283,6 +284,14 @@ class AcObj:
 		return False
 
 	def read_hierarchy_state(self, ac_file, toks):
+		# hidden: Since OSG AC3D loader ignores this token, I have decided to ignore it aswell, need to read it though, in case its there.
+		# locked: Blender does not support locking of entire object.
+		# folded: Blender API does not allow access to to this.
+		return False
+
+	def read_url(self, ac_file, toks):
+		# we read the url, but its not used for anything in Blender, since Blender do not have that property.
+		self.url = toks[1].strip('"')
 		return False
 
 	def read_location(self, ac_file, toks):
