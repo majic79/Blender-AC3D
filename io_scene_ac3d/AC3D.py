@@ -193,30 +193,34 @@ class Poly (Object):
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
 						# TODO: Optionally over-write existing textures
-						if not os.path.exists(export_tex):
-							if bl_im.packed_file:
-								bl_im.file_format = 'PNG'
-								bl_im.filepath = export_tex
-								bl_im.unpack('WRITE_ORIGINAL')
-								# We cannot repack it after unpacking, as that will remove the newly saved image from the disk:
-								# bl_im.pack(True)
-							else:
-								abs_path = bpy.path.abspath(bl_im.filepath)
-								if not os.path.exists(abs_path):
-									TRACE('Warning: Texture doesn\'t exists: {0}'.format(bl_im.filepath))
+						if bl_im.has_data:
+							if not os.path.exists(export_tex):
+								if bl_im.packed_file:
+									bl_im.file_format = 'PNG'
+									bl_im.filepath = export_tex
+									bl_im.unpack('WRITE_ORIGINAL')
+									# We cannot repack it after unpacking, as that will remove the newly saved image from the disk:
+									# bl_im.pack(True)
 								else:
-									if not bl_im.is_dirty:
-										shutil.copy(abs_path, export_tex)
+									abs_path = bpy.path.abspath(bl_im.filepath)
+									if not os.path.exists(abs_path):
+										TRACE('Warning: Texture doesn\'t exists: {0}'.format(bl_im.filepath))
 									else:
-										# To protect original texture, we actually save the modified texture only to the export location.
-										# After exporting, the texture in Blender will point to the old location, but no longer be dirty.
-										# Therefore users should be careful to save the image manually if they want the original to be overwritten.
-										orig_file_path = bl_im.filepath
-										bl_im.filepath_raw = export_tex
-										bl_im.save()
-										bl_im.filepath_raw = orig_file_path
-						# else:
-							# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
+										if not bl_im.is_dirty:
+											shutil.copy(abs_path, export_tex)
+										else:
+											# To protect original texture, we actually save the modified texture only to the export location.
+											# After exporting, the texture in Blender will point to the old location, but no longer be dirty.
+											# Therefore users should be careful to save the image manually if they want the original to be overwritten.
+											orig_file_path = bl_im.filepath
+											bl_im.filepath_raw = export_tex
+											bl_im.save()
+											bl_im.filepath_raw = orig_file_path
+							# else:
+								# TRACE('File already exists "{0}"- not overwriting!'.format(tex_name))
+						else:
+							self.ex_conf.operator.report({'WARNING'}, 'AC3D Exporter: Texture "'+bl_tex.name+'" ('+tex_name+')'+' in material: "'+bl_mat.name+ '" contains no image and was not exported alongside model. (The .ac texture reference was exported though)')
+						
 						
 						self.tex_name = tex_name
 						try:
