@@ -247,6 +247,11 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="export mirror colour as ambient colour",
 							default=False,
 							)
+	export_lines = BoolProperty(
+							name="Export lines also",
+							description="Export standalone edges, bezier curves etc. as AC3D lines. Will make export take longer.",
+							default=False,
+							)
 	crease_angle = FloatProperty(
 							name="Default Crease Angle",
 							description="Default crease angle for exported .ac faces",

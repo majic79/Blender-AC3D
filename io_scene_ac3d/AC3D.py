@@ -1,4 +1,4 @@
-import bpy, os, shutil, re
+import bpy, os, shutil, re, bmesh
 from math import radians, degrees
 from mathutils import Vector, Matrix
 
@@ -275,14 +275,63 @@ class Poly (Object):
 			surf = self.Surface(self.export_config, poly, self.ac_mats, mesh.show_double_sided, is_flipped, uv_coords, 0)
 			self.surfaces.append(surf)
 
-		# Commented out due to it will not only output standalone edges, but all edges around polygons also
-		#
-		#for edge_idx in range(len(mesh.edges)):
-		#	bl_edge = mesh.edges[edge_idx]
-		#	
-		#	edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
-		#	self.surfaces.append(edge)
+		if self.ex_conf.export_lines:
+			# Standalone edges without faces.
+			#
+			faceEdges = set( [ edge for face in mesh.polygons for edge_keys in face.edge_keys for edge in edge_keys] )
+			allEdges  = set( range( len( mesh.edges ) ) )
+			freeEdges = allEdges.difference( faceEdges )
 
+			for edge_idx in freeEdges:
+				bl_edge = mesh.edges[edge_idx]
+				
+				edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
+				self.surfaces.append(edge)
+
+		return
+		
+		# the rest is test stuff, I will commit this, but remove it in next commit, so its history is not forgotten.
+		# the above is simpler, faster and better way of doing the same:
+
+		bm = bmesh.new()
+		bm.from_mesh( mesh )
+
+		faceEdges = set( [ e.index for f in bm.faces for e in f.edges ] )
+		allEdges  = set( range( len( bm.edges ) ) )
+		freeEdges = allEdges.difference( faceEdges )
+		edges = bm.edges
+		edges.ensure_lookup_table()
+
+		lines = []
+
+		for data in freeEdges:
+			alright = True
+			#print( "Indices of non face edges: ", data )
+			verts3d = []
+			for vert in bm.edges[data].verts:
+				verts3d.append(vert.co)
+			#print(verts)
+			vertsIndex = []
+			for coord in verts3d:
+				if alright:
+					breakAgain = False
+					for i,vertex in enumerate(mesh.vertices):
+						vertexVec = Vector(vertex.co)
+						if vertexVec == coord:
+							#print("found match")
+							vertsIndex.append(i)
+							breakAgain = True
+							break
+						#else:
+							#print(str(vertexVec)+" != "+str(coord))
+					if breakAgain:
+						continue
+					alright = False
+			if alright:
+				lines.append(vertsIndex)
+				#edge = self.Surface(self.export_config, vertsIndex, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
+				#self.surfaces.append(edge)
+		#print(lines)
 		
 	def _write( self, strm ):
 

@@ -54,6 +54,7 @@ class ExportConf:
 			merge_materials,
 			mircol_as_emis,
 			mircol_as_amb,
+			export_lines,
 			crease_angle,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
@@ -68,6 +69,7 @@ class ExportConf:
 		self.mircol_as_amb = mircol_as_amb
 		self.crease_angle = crease_angle
 		self.merge_materials = merge_materials
+		self.export_lines = export_lines
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -88,6 +90,7 @@ class ExportAC3D:
 			merge_materials=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
+			export_lines=False,
 			crease_angle=radians(35.0),
 			):
 
@@ -103,6 +106,7 @@ class ExportAC3D:
 										merge_materials,
 										mircol_as_emis,
 										mircol_as_amb,
+										export_lines,
 										crease_angle,										
 										)
 
