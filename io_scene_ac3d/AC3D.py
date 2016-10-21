@@ -193,6 +193,9 @@ class Poly (Object):
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
 						# TODO: Optionally over-write existing textures
+						if not bl_im.has_data:
+							# sometimes it has data, but its just not updated.
+							bl_im.update()
 						if bl_im.has_data:
 							if not os.path.exists(export_tex):
 								if bl_im.packed_file:
