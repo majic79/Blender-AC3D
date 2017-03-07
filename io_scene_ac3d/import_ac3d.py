@@ -250,7 +250,7 @@ class AcObj:
 			line = self.world.readLine(ac_file)
 			line = line.strip().split()
 			if len(line) > 2:
-				self.vert_list.append(self.import_config.global_matrix * Vector([float(x) for x in line]))
+				self.vert_list.append(Vector([float(x) for x in line]))
 			else:
 				self.readPrevious = True
 				break
@@ -298,11 +298,24 @@ class AcObj:
 		return False
 
 	def read_location(self, ac_file, toks):
-		self.location=(self.import_config.global_matrix * Vector([float(x) for x in toks[1:4]]))
+		if self.type and self.type.lower() == 'world':
+			self.location=(Vector([float(x) for x in toks[1:4]]))
+		else:
+			if self.ac_parent and self.ac_parent.type.lower() == 'world':
+				fullWorldMatrix = mathutils.Matrix(self.import_config.global_matrix)
+				fullWorldMatrix[0][3] = self.ac_parent.location[0]
+				fullWorldMatrix[1][3] = self.ac_parent.location[1]
+				fullWorldMatrix[2][3] = self.ac_parent.location[2]
+				self.location=(fullWorldMatrix * Vector([float(x) for x in toks[1:4]]))
+			else:
+				self.location=(Vector([float(x) for x in toks[1:4]]))
 		return False
 
 	def read_rotation(self, ac_file, toks):
 		self.rotation = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
+		if self.ac_parent:
+			if self.ac_parent.type.lower() == 'world':
+				self.rotation = self.rotation * self.import_config.global_matrix.to_3x3()
 #		TODO check
 #		rotation = mathutils.Matrix(( [float(x) for x in toks[1:4]],
 #		                              [float(x) for x in toks[4:7]],
@@ -333,6 +346,12 @@ class AcObj:
 		return False
 
 	def read_children(self, ac_file, toks):
+		if self.type.lower() == 'world':
+			# since children are always last thing read, we have to apply the world rotation here,
+			# cause the global_matrix is applied when reading the children.
+			self4 = self.rotation.to_4x4()
+			self.import_config.global_matrix = self4 * self.import_config.global_matrix
+
 		num_kids = int(toks[1])
 		for n in range(num_kids):
 			line = self.world.readLine(ac_file)
@@ -353,22 +372,21 @@ class AcObj:
 	This function does the work of creating an object in blender and configuring it correctly
 	'''
 	def create_blender_object(self, ac_matlist, str_pre, bLevelLinked):
-
-		if self.type == 'world':
+		if self.type.lower() == 'world':
 			self.name = self.import_config.ac_name
-			self.rotation = self.import_config.global_matrix
+			
 		me = None
-		if self.type == 'group':
+		if self.type.lower() == 'group':
 			# Create an empty object
 			self.bl_obj = bpy.data.objects.new(self.name, None)
-
-		if self.type == 'poly':
+			
+		if self.type.lower() == 'poly':
 			meshname = self.name+".mesh"
 			if len(self.data)>0:
 				meshname = self.data
 			me = bpy.data.meshes.new(meshname)
 			self.bl_obj = bpy.data.objects.new(self.name, me)
-
+			
 		# setup parent object
 		if self.ac_parent:
 			self.bl_obj.parent = self.ac_parent.bl_obj
