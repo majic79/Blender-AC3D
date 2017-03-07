@@ -40,6 +40,8 @@ class Object:
 		if bl_obj:
 			self.matrix_world = local_transform * bl_obj.matrix_world
 			self.pos_abs = self.matrix_world.to_translation()
+			self.location = bl_obj.location
+			self.rotation = bl_obj.matrix_basis.to_3x3()
 		else:
 			self.matrix_world = local_transform
 			self.pos_abs = None
@@ -82,13 +84,26 @@ class Object:
 		if len(self.url):
 			strm.write('url {0}\n'.format(self.url))
 
-		if self.parent and self.pos_abs:	
+		if self.parent and self.location:
 			# position relative to parent
-			pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
+			#pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
 
-			location = self.export_config.global_matrix * pos_rel
+			location = self.location
 			if any(c != 0 for c in location):
 				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
+
+		if self.parent and self.rotation:
+			# position relative to parent
+			#pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
+
+			rotation = self.rotation
+			if rotation != Matrix().to_3x3():
+				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(rotation[0][0], rotation[0][1], rotation[0][2], rotation[1][0], rotation[1][1], rotation[1][2], rotation[2][0], rotation[2][1], rotation[2][2]))
+
+		if self.type == 'world':
+			rotation = self.export_config.global_matrix.to_3x3()
+			if rotation != Matrix().to_3x3():
+				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(rotation[0][0], rotation[0][1], rotation[0][2], rotation[1][0], rotation[1][1], rotation[1][2], rotation[2][0], rotation[2][1], rotation[2][2]))
 
 		self._write(strm)
 		strm.write('kids {0}\n'.format(len(self.children)))
@@ -244,7 +259,7 @@ class Poly (Object):
 		transform = self.export_config.global_matrix\
 							* Matrix.Translation(-self.pos_abs)\
 							* self.matrix_world
-		self.vertices = [transform * v.co for v in mesh.vertices]
+		self.vertices = [v.co for v in mesh.vertices]
 		
 	def _parseFaces( self, mesh ):
 		'''
