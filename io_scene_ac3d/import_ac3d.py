@@ -469,8 +469,11 @@ class AcObj:
 			self.bl_obj.show_transparent = self.import_config.display_transparency
 
 		if self.bl_obj:
-			self.bl_obj.rotation_euler = self.rotation.to_euler()
-			self.bl_obj.location = self.location
+			self3 = mathutils.Matrix.Translation(self.location)
+			self4 = self.rotation.to_4x4()
+			#self.bl_obj.rotation_euler = self.rotation.to_euler()
+			#self.bl_obj.location = self.location
+			self.bl_obj.matrix_basis = self3 * self4
 
 			if self.ac_parent and self.ac_parent.type.lower() == 'world':
 				matrix_basis = self.bl_obj.matrix_basis
@@ -487,6 +490,13 @@ class AcObj:
 # There's a bug somewhere - this ought to work....
 			self.import_config.context.scene.objects.active = self.bl_obj
 #			bpy.ops.object.origin_set('ORIGIN_GEOMETRY', 'MEDIAN')
+
+			if self.bl_obj.matrix_basis.is_negative:
+				# when negative scaling is applied, normals might be flipped, so we apply the scaling in those cases.
+				self.bl_obj.select = True
+				bpy.context.scene.objects.active = self.bl_obj
+				bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
 			if self.hidden == True:
 				self.bl_obj.hide = True
 			

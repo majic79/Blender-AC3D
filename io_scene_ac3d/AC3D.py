@@ -86,16 +86,12 @@ class Object:
 
 		if self.parent and self.location:
 			# position relative to parent
-			#pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
-
 			location = self.location
 			if any(c != 0 for c in location):
 				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
 		if self.parent and self.rotation:
-			# position relative to parent
-			#pos_rel = self.pos_abs - self.parent.matrix_world.to_translation()
-
+			# rotation relative to parent
 			rotation = self.rotation
 			if rotation != Matrix().to_3x3():
 				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(rotation[0][0], rotation[0][1], rotation[0][2], rotation[1][0], rotation[1][1], rotation[1][2], rotation[2][0], rotation[2][1], rotation[2][2]))
