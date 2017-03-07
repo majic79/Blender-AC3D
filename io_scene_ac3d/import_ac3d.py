@@ -298,24 +298,11 @@ class AcObj:
 		return False
 
 	def read_location(self, ac_file, toks):
-		if self.type and self.type.lower() == 'world':
-			self.location=(Vector([float(x) for x in toks[1:4]]))
-		else:
-			if self.ac_parent and self.ac_parent.type.lower() == 'world':
-				fullWorldMatrix = mathutils.Matrix(self.import_config.global_matrix)
-				fullWorldMatrix[0][3] = self.ac_parent.location[0]
-				fullWorldMatrix[1][3] = self.ac_parent.location[1]
-				fullWorldMatrix[2][3] = self.ac_parent.location[2]
-				self.location=(fullWorldMatrix * Vector([float(x) for x in toks[1:4]]))
-			else:
-				self.location=(Vector([float(x) for x in toks[1:4]]))
+		self.location=(Vector([float(x) for x in toks[1:4]]))
 		return False
 
 	def read_rotation(self, ac_file, toks):
 		self.rotation = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
-		if self.ac_parent:
-			if self.ac_parent.type.lower() == 'world':
-				self.rotation = self.rotation * self.import_config.global_matrix.to_3x3()
 #		TODO check
 #		rotation = mathutils.Matrix(( [float(x) for x in toks[1:4]],
 #		                              [float(x) for x in toks[4:7]],
@@ -347,10 +334,14 @@ class AcObj:
 
 	def read_children(self, ac_file, toks):
 		if self.type.lower() == 'world':
-			# since children are always last thing read, we have to apply the world rotation here,
-			# cause the global_matrix is applied when reading the children.
+			# since children are always last thing read, we have to apply the world rotation and location here,
+			# cause the global_matrix is applied when making the children of world/scene.
 			self4 = self.rotation.to_4x4()
+			self3 = mathutils.Matrix.Translation(self.location)
 			self.import_config.global_matrix = self4 * self.import_config.global_matrix
+			self.import_config.global_matrix[0][3] = self.location[0]
+			self.import_config.global_matrix[1][3] = self.location[1]
+			self.import_config.global_matrix[2][3] = self.location[2]
 
 		num_kids = int(toks[1])
 		for n in range(num_kids):
@@ -479,8 +470,18 @@ class AcObj:
 
 		if self.bl_obj:
 			self.bl_obj.rotation_euler = self.rotation.to_euler()
-
 			self.bl_obj.location = self.location
+
+			if self.ac_parent and self.ac_parent.type.lower() == 'world':
+				matrix_basis = self.bl_obj.matrix_basis
+				matrix_basis = self.import_config.global_matrix * matrix_basis # order of this multiplication matters
+				self.bl_obj.matrix_basis = matrix_basis
+
+			if not self.ac_parent:
+				# this is for the case where there is no world object
+				matrix_basis = self.bl_obj.matrix_basis
+				matrix_basis = self.import_config.global_matrix * matrix_basis # order of this multiplication matters
+				self.bl_obj.matrix_basis = matrix_basis
 			
 			self.import_config.context.scene.objects.link(self.bl_obj)
 # There's a bug somewhere - this ought to work....
