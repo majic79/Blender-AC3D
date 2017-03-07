@@ -75,12 +75,34 @@ class AcMat:
 		self.import_config = import_config
 
 	def make_blender_mat(self, bl_mat):
+		# Blender:
+		# ========
+		# diffuse_intensity  : 0-1
+		# diffuse_color      : 0-1 vector
+		# mirror_color       : 0-1 vector
+		# ambient            : 0-1
+		# emit               : 0-2
+		# specular_intensity : 0-1
+		# specular_color     : 0-1 vector
+		# specular_hardness  : 1-511
+		# alpha              : 0-1
+		#
+		# AC3D:
+		# ========
+		# diffuse            : 0-1 vector
+		# ambient            : 0-1 vector
+		# emissive           : 0-1 vector
+		# specular           : 0-1 vector
+		# shininess          : 0-128
+		# transparency       : 0-1
+		#
 		bl_mat.specular_shader = 'PHONG'
 		bl_mat.diffuse_color = self.rgb
+		bl_mat.diffuse_intensity = 1.0
 		bl_mat.ambient = (self.amb[0] + self.amb[1] + self.amb[2]) / 3.0
 		if self.import_config.use_amb_as_mircol:
 				bl_mat.mirror_color = self.amb
-		bl_mat.emit = (self.emis[0] + self.emis[1] + self.emis[2]) / 3.0
+		bl_mat.emit = ((self.emis[0] + self.emis[1] + self.emis[2]) / 3.0) * 2
 		if self.import_config.use_emis_as_mircol:
 				bl_mat.mirror_color = self.emis
 		bl_mat.specular_color = self.spec

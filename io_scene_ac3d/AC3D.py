@@ -438,8 +438,29 @@ class Material:
 		self.merge = False
 
 		if bl_mat:
+			# Blender:
+			# ========
+			# diffuse_intensity  : 0-1
+			# diffuse_color      : 0-1 vector
+			# mirror_color       : 0-1 vector
+			# ambient            : 0-1
+			# emit               : 0-2
+			# specular_intensity : 0-1
+			# specular_color     : 0-1 vector
+			# specular_hardness  : 1-511
+			# alpha              : 0-1
+			#
+			# AC3D:
+			# ========
+			# diffuse            : 0-1 vector
+			# ambient            : 0-1 vector
+			# emissive           : 0-1 vector
+			# specular           : 0-1 vector
+			# shininess          : 0-128
+			# transparency       : 0-1
+			#		
 			self.name = re.sub('["]', '', bl_mat.name) # remove any " from the name.
-			self.rgb = bl_mat.diffuse_color
+			self.rgb = bl_mat.diffuse_intensity * bl_mat.diffuse_color
 			if export_config.mircol_as_amb:
 				self.amb = bl_mat.mirror_color
 			else:
@@ -447,7 +468,7 @@ class Material:
 			if export_config.mircol_as_emis:
 				self.emis = bl_mat.mirror_color# * bl_mat.emit   confusing if enabled, should be either mirror color or greyscale emissive
 			else:
-				self.emis = [bl_mat.emit, bl_mat.emit, bl_mat.emit]
+				self.emis = [bl_mat.emit/2, bl_mat.emit/2, bl_mat.emit/2]
 			self.spec = bl_mat.specular_intensity * bl_mat.specular_color   
 			self.merge = export_config.merge_materials
 
