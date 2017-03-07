@@ -491,12 +491,6 @@ class AcObj:
 			self.import_config.context.scene.objects.active = self.bl_obj
 #			bpy.ops.object.origin_set('ORIGIN_GEOMETRY', 'MEDIAN')
 
-			if self.bl_obj.matrix_basis.is_negative:
-				# when negative scaling is applied, normals might be flipped, so we apply the scaling in those cases.
-				self.bl_obj.select = True
-				bpy.context.scene.objects.active = self.bl_obj
-				bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-
 			if self.hidden == True:
 				self.bl_obj.hide = True
 			
@@ -823,3 +817,9 @@ class ImportAC3D:
 				bUseLink = False
 			obj.create_blender_object(self.matlist, "", bUseLink)
 
+		for obj in bpy.context.scene.objects:
+			if obj.matrix_basis.is_negative:
+				# when negative scaling is applied, normals might be flipped, so we apply the scaling in those cases.
+				obj.select = True
+				bpy.context.scene.objects.active = obj
+				bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
