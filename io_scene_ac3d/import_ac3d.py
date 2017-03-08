@@ -851,6 +851,9 @@ class ImportAC3D:
 		# spec %f %f %f
 		# shi %d
 		# trans %f
+		# data %d
+		# dataContent
+		# dataContent
 		# ENDMAT
 		if len(line) != 2:
 			self.report_error("invalid material name on line ({ln})".format(ln=line))
