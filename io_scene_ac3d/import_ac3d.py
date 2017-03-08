@@ -699,6 +699,7 @@ class ImportAC3D:
 
 		self.tokens = 	{
 						'MATERIAL':		self.read_material,
+						'MAT':			self.read_multiline_material,
 						'OBJECT':		self.read_object,
 						}
 		self.oblist = []
@@ -734,6 +735,17 @@ class ImportAC3D:
 			operator.report({'ERROR'},"Invalid file header: {0}".format(self.header))
 			ac_file.close()
 			return None
+
+		if AC3D_ver == 'b':
+			print("AC3D file is version 'b'")
+		else:
+			if AC3D_ver == 'c':
+				print("AC3D file is version 'c'")
+			else:
+				operator.report({'ERROR'},"Unsupported AC3D version: {0}".format(self.header))
+				ac_file.close()
+				return None
+
 
 		self.read_ac_file(ac_file)
 
@@ -819,6 +831,62 @@ class ImportAC3D:
 						float(line[21]),
 						self.import_config,
 						))
+
+	def read_mat_line(self, ac_file):
+		line = self.readLine(ac_file)
+		if line != None:
+			line = line.split()
+		else:
+			self.report_error("unexpected end of file in materials")
+		return line
+
+	'''
+	Process multiline material in AC3D file version 'c' (ver12)
+	'''
+	def read_multiline_material(self, ac_file, line):
+		# MAT %s
+		# rgb %f %f %f
+		# amb %f %f %f
+		# emis %f %f %f
+		# spec %f %f %f
+		# shi %d
+		# trans %f
+		# ENDMAT
+		if len(line) != 2:
+			self.report_error("invalid material name on line ({ln})".format(ln=line))
+		name = line[1]
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'rgb' or len(line) != 4:
+			self.report_error("invalid material rgb on line ({ln})".format(ln=line))
+		rgb = [float(x) for x in line[1:4]]
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'amb' or len(line) != 4:
+			self.report_error("invalid material amb on line ({ln})".format(ln=line))
+		amb = [float(x) for x in line[1:4]]
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'emis' or len(line) != 4:
+			self.report_error("invalid material emis on line ({ln})".format(ln=line))
+		emis = [float(x) for x in line[1:4]]
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'spec' or len(line) != 4:
+			self.report_error("invalid material spec on line ({ln})".format(ln=line))
+		spec = [float(x) for x in line[1:4]]
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'shi' or len(line) != 2:
+			self.report_error("invalid material shi on line ({ln})".format(ln=line))
+		shi = float(line[1]) # it should be int but float seems to be used sometimes
+		line = self.read_mat_line(ac_file)
+		if line[0] != 'trans' or len(line) != 2:
+			self.report_error("invalid material trans on line ({ln})".format(ln=line))
+		trans = float(line[1])
+		line = self.read_mat_line(ac_file)
+		if line[0] == 'data':
+			line = self.read_mat_line(ac_file)
+			while line != None and line[0] != 'ENDMAT':
+				line = self.read_mat_line(ac_file)
+		if line[0] != 'ENDMAT' or len(line) != 1:
+			self.report_error("invalid material ENDMAT on line ({ln})".format(ln=line))
+		self.matlist.append(AcMat(name,rgb,amb,emis,spec,shi,trans, self.import_config))
 
 	'''
 	Read the Object definition (including child objects)
