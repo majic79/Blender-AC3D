@@ -38,13 +38,16 @@ class Object:
 													#             put spaces into it)
 
 		if bl_obj:
-			self.matrix_world = local_transform * bl_obj.matrix_world
-			self.pos_abs = self.matrix_world.to_translation()
-			self.location = bl_obj.location
-			self.rotation = bl_obj.matrix_basis.to_3x3()
+			#self.matrix_world = local_transform * bl_obj.matrix_world
+			#self.pos_abs = self.matrix_world.to_translation()
+			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_basis
+			self.location = localMatrix.to_translation() #bl_obj.location#
+			self.rotation = localMatrix.to_3x3()
 		else:
-			self.matrix_world = local_transform
-			self.pos_abs = None
+			self.location = None
+			self.rotation = None
+			#self.matrix_world = local_transform
+			#self.pos_abs = None
 
 		self.children = []
 		self.parent = None
@@ -84,13 +87,13 @@ class Object:
 		if len(self.url):
 			strm.write('url {0}\n'.format(self.url))
 
-		if self.parent and self.location:
+		if self.location:
 			# position relative to parent
 			location = self.location
 			if any(c != 0 for c in location):
 				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
-		if self.parent and self.rotation:
+		if self.rotation:
 			# rotation relative to parent
 			rotation = self.rotation
 			if rotation != Matrix().to_3x3():
@@ -193,7 +196,11 @@ class Poly (Object):
 
 			if not len(self.tex_name):
 				for tex_slot in bl_mat.texture_slots:
-					if tex_slot and tex_slot.texture_coords == 'UV':
+					if tex_slot:
+						old_tc = tex_slot.texture_coords
+						if tex_slot.texture_coords != 'UV':
+							tex_slot.texture_coords = 'UV'
+							#tex_slot.uv_layer = 
 						bl_tex = tex_slot.texture
 						bl_im = bl_tex.image
 						if(bl_im == None):
@@ -202,6 +209,10 @@ class Poly (Object):
 							continue
 						tex_name = bpy.path.basename(bl_im.filepath)
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
+						if bl_im.packed_file:
+							splt = export_tex.rsplit('.', 1)[0]
+							export_tex = splt + '.png'
+							tex_name = bpy.path.basename(export_tex)
 						# TRACE('Exporting texture "{0}" to "{1}"'.format(bl_im.filepath, export_tex))
 						# TODO: Optionally over-write existing textures
 						if not bl_im.has_data:
@@ -211,8 +222,15 @@ class Poly (Object):
 							if not os.path.exists(export_tex):
 								if bl_im.packed_file:
 									bl_im.file_format = 'PNG'
-									bl_im.filepath = export_tex
-									bl_im.unpack('WRITE_ORIGINAL')
+									orig_file_path = bl_im.filepath
+									bl_im.filepath_raw = export_tex
+									#print(bl_im.filepath)
+									#print(bl_im.filepath_raw)
+									bl_im.save()
+									bl_im.filepath_raw = orig_file_path
+									#base = os.path.splitext(export_tex)[0]
+									#os.rename(export_tex, base + ".png")
+									# bl_im.unpack('WRITE_ORIGINAL')
 									# We cannot repack it after unpacking, as that will remove the newly saved image from the disk:
 									# bl_im.pack(True)
 								else:
@@ -237,6 +255,7 @@ class Poly (Object):
 						
 						
 						self.tex_name = tex_name
+						tex_slot.texture_coords = old_tc
 						try:
 							self.tex_rep = [1, 1] #[tex_slot.texture.repeat_x, tex_slot.texture.repeat_y] this is not the same as blender texture repeat!
 						except:
@@ -252,9 +271,9 @@ class Poly (Object):
 		'''
 		Extract the vertices from a blender mesh
 		'''
-		transform = self.export_config.global_matrix\
-							* Matrix.Translation(-self.pos_abs)\
-							* self.matrix_world
+		#transform = self.export_config.global_matrix\
+		#					* Matrix.Translation(-self.pos_abs)\
+		#					* self.matrix_world
 		self.vertices = [v.co for v in mesh.vertices]
 		
 	def _parseFaces( self, mesh ):
