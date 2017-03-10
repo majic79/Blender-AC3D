@@ -55,6 +55,7 @@ class ExportConf:
 			mircol_as_emis,
 			mircol_as_amb,
 			export_lines,
+			export_hidden,
 			crease_angle,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
@@ -70,6 +71,7 @@ class ExportConf:
 		self.crease_angle = crease_angle
 		self.merge_materials = merge_materials
 		self.export_lines = export_lines
+		self.export_hidden = export_hidden
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -91,6 +93,7 @@ class ExportAC3D:
 			mircol_as_emis=True,
 			mircol_as_amb=False,
 			export_lines=False,
+			export_hidden=False,
 			crease_angle=radians(35.0),
 			):
 
@@ -107,6 +110,7 @@ class ExportAC3D:
 										mircol_as_emis,
 										mircol_as_amb,
 										export_lines,
+										export_hidden,
 										crease_angle,										
 										)
 
@@ -148,9 +152,13 @@ class ExportAC3D:
 			# proxy is selected. We therefore consider all objects from libraries as
 			# selected, as the only possibility to get them considered is if their
 			# proxy should be exported.
+			hidden = ob.hide
+			if self.export_conf.export_hidden:
+				ob.hide = False
+
 			if 		(not self.export_conf.use_render_layers or ob.is_visible(self.export_conf.context.scene))\
 				and (not self.export_conf.use_selection or ob.select or ignore_select):
-
+				ob.hide = hidden
 				# We need to check for dupligroups first as every type of object can be
 				# converted to a dupligroup without removing the data from the old type.
 				if ob.dupli_type == 'GROUP':
@@ -177,7 +185,7 @@ class ExportAC3D:
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 				else:
 					TRACE('Skipping object {0} (type={1})'.format(ob.name, ob.type))
-
+			ob.hide = hidden
 			if ac_ob:
 				parent.addChild(ac_ob)
 				next_parent = ac_ob

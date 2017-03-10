@@ -252,9 +252,14 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="Export standalone edges, bezier curves etc. as AC3D lines. Will make export take longer.",
 							default=False,
 							)
+	export_hidden = BoolProperty(
+							name="Export hidden objects",
+							description="Newer AC3D format supports hidding objects. If checked those objects will be exported as hidden. (notice that in engines with older importers they might show up)",
+							default=False,
+						)
 	crease_angle = FloatProperty(
 							name="Default Crease Angle",
-							description="Default crease angle for exported .ac faces",
+							description="Default crease/smooth angle for exported .ac faces that has not explicit set it.",
 							default=radians(35.0),
 							options={"ANIMATABLE"},
 							unit="ROTATION",

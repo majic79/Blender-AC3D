@@ -33,11 +33,13 @@ class Object:
 		self.name = name.replace('"','') # quotes not allowed...
 		self.type = ob_type
 		self.bl_obj = bl_obj
+		self.hidden = False
 		self.data = ''				# custom data (eg. description)
 		self.url = ''					# custom url (use for whatever you want but never ever
 													#             put spaces into it)
-
+		
 		if bl_obj:
+			self.hidden = bl_obj.hide
 			#self.matrix_world = local_transform * bl_obj.matrix_world
 			#self.pos_abs = self.matrix_world.to_translation()
 			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_basis
@@ -86,6 +88,9 @@ class Object:
 			
 		if len(self.url):
 			strm.write('url {0}\n'.format(self.url))
+
+		if self.hidden:
+			strm.write('hidden\n')
 
 		if self.location:
 			# position relative to parent
