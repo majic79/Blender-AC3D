@@ -281,8 +281,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 
 		global_matrix = axis_conversion(to_forward=self.axis_forward,
 										to_up=self.axis_up,
-										).to_4x4()
-
+										)
 		keywords["global_matrix"] = global_matrix
 		t = time.mktime(datetime.datetime.now().timetuple())
 		export_ac3d.ExportAC3D(self, context, **keywords)
