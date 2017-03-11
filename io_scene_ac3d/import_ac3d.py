@@ -324,7 +324,18 @@ class AcObj:
 		return False
 
 	def read_rotation(self, ac_file, toks):
-		self.rotation = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
+		temp = mathutils.Matrix(([float(x) for x in toks[1:4]], [float(x) for x in toks[4:7]], [float(x) for x in toks[7:10]]))
+		rearranged = mathutils.Matrix().to_3x3()
+		rearranged[0][0] = temp[0][0]
+		rearranged[1][0] = temp[0][1]
+		rearranged[2][0] = temp[0][2]
+		rearranged[0][1] = temp[1][0]
+		rearranged[1][1] = temp[1][1]
+		rearranged[2][1] = temp[1][2]
+		rearranged[0][2] = temp[2][0]
+		rearranged[1][2] = temp[2][1]
+		rearranged[2][2] = temp[2][2]
+		self.rotation = rearranged
 #		TODO check
 #		rotation = mathutils.Matrix(( [float(x) for x in toks[1:4]],
 #		                              [float(x) for x in toks[4:7]],
