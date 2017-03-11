@@ -214,6 +214,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							)
 	export_rots    = EnumProperty(
 							name="Matrices",
+							description="Some loaders interpret the matrices wrong, to be safe, use Apply before Export.",
 							items=(('apply', "Apply before export", ""),
 								  ('export', "Export", ""),
 								),
@@ -267,7 +268,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 	crease_angle = FloatProperty(
 							name="Default Crease Angle",
 							description="Default crease/smooth angle for exported .ac faces that has not explicit set it.",
-							default=radians(35.0),
+							default=radians(40.0),
 							options={"ANIMATABLE"},
 							unit="ROTATION",
 							subtype="ANGLE",

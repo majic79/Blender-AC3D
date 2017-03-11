@@ -93,7 +93,7 @@ class ExportAC3D:
 			mircol_as_amb=False,
 			export_lines=False,
 			export_hidden=False,
-			crease_angle=radians(35.0),
+			crease_angle=radians(40.0),
 			):
 
 			self.export_conf = ExportConf(
