@@ -42,7 +42,7 @@ class Object:
 			self.hidden = bl_obj.hide
 			#self.matrix_world = local_transform * bl_obj.matrix_world
 			#self.pos_abs = self.matrix_world.to_translation()
-			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_basis
+			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_local   # _basis
 			self.location = localMatrix.to_translation() #bl_obj.location#
 			self.rotation = localMatrix.to_3x3()
 		else:
@@ -99,15 +99,16 @@ class Object:
 				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
 		if self.rotation:
-			# rotation relative to parent
-			rotation = self.rotation
-			if rotation != Matrix().to_3x3():
-				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(rotation[0][0], rotation[0][1], rotation[0][2], rotation[1][0], rotation[1][1], rotation[1][2], rotation[2][0], rotation[2][1], rotation[2][2]))
+			# rotation/scale relative to parent
+			exportMatrix = self.rotation.to_3x3()
+			print(exportMatrix)
+			if exportMatrix != Matrix().to_3x3():
+				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(exportMatrix[0][0], exportMatrix[1][0], exportMatrix[2][0], exportMatrix[0][1], exportMatrix[1][1], exportMatrix[2][1], exportMatrix[0][2], exportMatrix[1][2], exportMatrix[2][2]))
 
 		if self.type == 'world':
-			rotation = self.export_config.global_matrix
-			if rotation != Matrix().to_3x3():
-				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(rotation[0][0], rotation[0][1], rotation[0][2], rotation[1][0], rotation[1][1], rotation[1][2], rotation[2][0], rotation[2][1], rotation[2][2]))
+			exportMatrix = self.export_config.global_matrix
+			if exportMatrix != Matrix().to_3x3():
+				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(exportMatrix[0][0], exportMatrix[1][0], exportMatrix[2][0], exportMatrix[0][1], exportMatrix[1][1], exportMatrix[2][1], exportMatrix[0][2], exportMatrix[1][2], exportMatrix[2][2]))
 
 		self._write(strm)
 		strm.write('kids {0}\n'.format(len(self.children)))
