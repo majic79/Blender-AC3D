@@ -40,7 +40,7 @@ class Object:
 		
 		if bl_obj:
 			self.hidden = bl_obj.hide
-			#self.matrix_world = local_transform * bl_obj.matrix_world
+			self.matrix_world = bl_obj.matrix_world
 			#self.pos_abs = self.matrix_world.to_translation()
 			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_local   # _basis
 			self.location = localMatrix.to_translation() #bl_obj.location#
@@ -92,20 +92,20 @@ class Object:
 		if self.hidden:
 			strm.write('hidden\n')
 
-		if self.location:
+		if self.location and self.export_config.export_rot:
 			# position relative to parent
 			location = self.location
 			if any(c != 0 for c in location):
 				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
 
-		if self.rotation:
+		if self.rotation and self.export_config.export_rot:
 			# rotation/scale relative to parent
 			exportMatrix = self.rotation.to_3x3()
 			print(exportMatrix)
 			if exportMatrix != Matrix().to_3x3():
 				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(exportMatrix[0][0], exportMatrix[1][0], exportMatrix[2][0], exportMatrix[0][1], exportMatrix[1][1], exportMatrix[2][1], exportMatrix[0][2], exportMatrix[1][2], exportMatrix[2][2]))
 
-		if self.type == 'world':
+		if self.type == 'world' and self.export_config.export_rot:
 			exportMatrix = self.export_config.global_matrix
 			if exportMatrix != Matrix().to_3x3():
 				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(exportMatrix[0][0], exportMatrix[1][0], exportMatrix[2][0], exportMatrix[0][1], exportMatrix[1][1], exportMatrix[2][1], exportMatrix[0][2], exportMatrix[1][2], exportMatrix[2][2]))
@@ -277,10 +277,13 @@ class Poly (Object):
 		'''
 		Extract the vertices from a blender mesh
 		'''
-		#transform = self.export_config.global_matrix\
-		#					* Matrix.Translation(-self.pos_abs)\
+		transform = Matrix().to_4x4()
+		transform.identity()
+		if not self.export_config.export_rot:
+			transform = self.export_config.global_matrix.to_4x4() * self.matrix_world
+		#* Matrix.Translation(-self.pos_abs)\
 		#					* self.matrix_world
-		self.vertices = [v.co for v in mesh.vertices]
+		self.vertices = [transform * v.co for v in mesh.vertices]
 		
 	def _parseFaces( self, mesh ):
 		'''

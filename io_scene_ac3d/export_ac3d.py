@@ -47,10 +47,9 @@ class ExportConf:
 			context,
 			filepath,
 			global_matrix,
-			use_selection,
+			export_rot,
 			use_render_layers,
-			skip_data,
-			global_coords,
+			use_selection,			
 			merge_materials,
 			mircol_as_emis,
 			mircol_as_amb,
@@ -64,14 +63,15 @@ class ExportConf:
 		self.global_matrix = global_matrix
 		self.use_selection = use_selection
 		self.use_render_layers = use_render_layers
-		self.skip_data = skip_data
-		self.global_coords = global_coords
+#		self.skip_data = skip_data
+#		self.global_coords = global_coords
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
 		self.crease_angle = crease_angle
 		self.merge_materials = merge_materials
 		self.export_lines = export_lines
 		self.export_hidden = export_hidden
+		self.export_rot    = export_rot
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -85,10 +85,9 @@ class ExportAC3D:
 			context,
 			filepath='',
 			global_matrix=None,
-			use_selection=False,
+			export_rot=False,
 			use_render_layers=True,
-			skip_data=False,
-			global_coords=False,
+			use_selection=False,
 			merge_materials=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
@@ -102,10 +101,9 @@ class ExportAC3D:
 										context,
 										filepath,
 										global_matrix,
-										use_selection,
+										export_rot,
 										use_render_layers,
-										skip_data,
-										global_coords,
+										use_selection,										
 										merge_materials,
 										mircol_as_emis,
 										mircol_as_amb,

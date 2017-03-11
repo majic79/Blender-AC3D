@@ -212,6 +212,13 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 								),
 							default='Y',
 							)
+	export_rots    = EnumProperty(
+							name="Matrices",
+							items=(('apply', "Apply before export", ""),
+								  ('export', "Export", ""),
+								),
+							default='apply',
+							)
 	use_render_layers = BoolProperty(
 							name="Only Render Layers",
 							description="Only export from selected render layers",
@@ -277,12 +284,17 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 											"axis_up",
 											"filter_glob",
 											"check_existing",
+											"export_rots",
 											))
 
 		global_matrix = axis_conversion(to_forward=self.axis_forward,
 										to_up=self.axis_up,
 										)
 		keywords["global_matrix"] = global_matrix
+		ex_rot = False
+		if self.export_rots == 'export':
+			ex_rot = True
+		keywords["export_rot"] = ex_rot
 		t = time.mktime(datetime.datetime.now().timetuple())
 		export_ac3d.ExportAC3D(self, context, **keywords)
 		t = time.mktime(datetime.datetime.now().timetuple()) - t
