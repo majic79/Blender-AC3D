@@ -1,38 +1,38 @@
-README for Blender-AC3D - Version 2.12
+#Blender-AC3D - Version 2.12
 
-What is it?
+##What is it?
 It's a few python scripts to import/export AC3D data into and out of Blender 2.63+. For earlier Blender 2.6x versions you need an older revision of the plugin (https://github.com/majic79/Blender-AC3D/tree/BL2.62)
 
-Why blender 2.6/2.7?
+##Why blender 2.6/2.7?
 Because in the migration from 2.4X to 2.5, it lost AC3D support. This mod aims to bring that back to 2.6 and 2.7
 
-So it had it before?
+##So it had it before?
 Yes, this is mainly a port of those files to enable the import/export of .ac files in blender 2.5
 
-How do I install it?
-open the blender/2.6/scripts/addons folder, then pull the io_scene_ac3d folder into the addons folder of blender. There's an alternative location you can drop it, at ~/.blender/2.6/scripts/addons (linux) or the equivalent windows user profile location.
+##How do I install it?
+open the blender/2.x/scripts/addons folder, then pull the io_scene_ac3d folder into the addons folder of blender. There's an alternative location you can drop it, at ~/.blender/2.x/scripts/addons (linux) or the equivalent windows user profile location.
 
-I can't see it in the import/export menu!
+##I can't see it in the import/export menu!
 You'll need to enable the script in the user preferences window after installing it - open the user preferences window (File->User Preferences or Ctrl-Alt-U) and then go to the Add-on tab, click the button for Import-Export and then check the box on the right of "Import-Export: AC3D (.ac)"
 
-Uh, I've done all that how do I use it?
+##Uh, I've done all that how do I use it?
 Go to File->Import->AC3D (.ac), select a file and let it do the work
 
-Why is export/import mirror color as emissive not longer checked by default?
+##Why is export/import mirror color as emissive not longer checked by default?
 In latest Blender versions mirror color is white per default, and that confused many users that what they exported would get totally emissive per default.
 
-Known Issues:
+##Known Issues:
 
 
 
-Things to come:
-	- I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
+##Things to come:
+* I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
 
-Follow the discussion at:
+##Follow the discussion at:
 
 http://www.flightgear.org/forums/viewtopic.php?f=18&t=13442
 
-Acknowledgments:
+##Acknowledgments:
 
 The Blender team: (http://www.blender.org) for such a fine piece of software
 Willian P Gerano for his original work (the very first version of this script was a port of his original work)
