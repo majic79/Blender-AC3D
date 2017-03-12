@@ -411,6 +411,14 @@ class AcObj:
 			me = bpy.data.meshes.new(meshname)
 			self.bl_obj = bpy.data.objects.new(self.name, me)
 			
+		if self.type.lower() == 'light':
+			# Create an light object
+			lampname = self.name+".lamp"
+			if len(self.data)>0:
+				lampname = self.data
+			lamp_data = bpy.data.lamps.new(name=lampname, type='POINT')
+			self.bl_obj = bpy.data.objects.new(self.name, object_data=lamp_data)
+
 		# setup parent object
 		if self.ac_parent:
 			self.bl_obj.parent = self.ac_parent.bl_obj

@@ -24,7 +24,7 @@ class Object:
 		Create a AC3D object from a blender object and it's children
 		
 		@param name			The name of the object
-		@param ob_type	The type of the object (world, poly, group)
+		@param ob_type	The type of the object (world, poly, group, light)
 		@param bl_obj	The according blender object
 		@param export_config	Settings for export TODO move to export method?
 		'''
@@ -57,7 +57,7 @@ class Object:
 	def addChild( self,
 								child ):
 		if not isinstance(child, Object):
-			raise Exception('addChild: can only add childs derived from Object')
+			raise Exception('addChild: can only add children derived from Object')
 		child.parent = self
 		self.children.append(child)
 		
@@ -444,6 +444,21 @@ class Group (Object):
 								export_config,
 								local_transform = Matrix() ):
 		Object.__init__(self, name, 'group', bl_obj, export_config, local_transform)
+
+# ------------------------------------------------------------------------------
+class Light (Object):
+	'''
+	An light group
+	
+	'''
+	def __init__( self,
+								name,
+								bl_obj,
+								export_config,
+								local_transform = Matrix() ):
+		Object.__init__(self, name, 'light', bl_obj, export_config, local_transform)
+		if bl_obj.data:
+			self.data = bl_obj.data.name.replace('"','')
 
 # ------------------------------------------------------------------------------
 

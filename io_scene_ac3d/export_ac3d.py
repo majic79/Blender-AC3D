@@ -55,6 +55,7 @@ class ExportConf:
 			mircol_as_amb,
 			export_lines,
 			export_hidden,
+			export_lights,
 			crease_angle,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
@@ -72,6 +73,7 @@ class ExportConf:
 		self.export_lines = export_lines
 		self.export_hidden = export_hidden
 		self.export_rot    = export_rot
+		self.export_lights = export_lights
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -93,6 +95,7 @@ class ExportAC3D:
 			mircol_as_amb=False,
 			export_lines=False,
 			export_hidden=False,
+			export_lights=False,
 			crease_angle=radians(40.0),
 			):
 
@@ -109,6 +112,7 @@ class ExportAC3D:
 										mircol_as_amb,
 										export_lines,
 										export_hidden,
+										export_lights,
 										crease_angle,										
 										)
 
@@ -159,6 +163,7 @@ class ExportAC3D:
 				ob.hide = hidden
 				# We need to check for dupligroups first as every type of object can be
 				# converted to a dupligroup without removing the data from the old type.
+				#print(ob.name+': '+ob.type+' '+ob.dupli_type)
 				if ob.dupli_type == 'GROUP':
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 					children = [child for child in ob.dupli_group.objects
@@ -181,6 +186,8 @@ class ExportAC3D:
 					continue
 				elif ob.type == 'EMPTY':
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
+				elif ob.type == 'LAMP' and self.export_conf.export_lights:
+					ac_ob = AC3D.Light(ob.name, ob, self.export_conf, local_transform)
 				else:
 					TRACE('Skipping object {0} (type={1})'.format(ob.name, ob.type))
 			ob.hide = hidden
