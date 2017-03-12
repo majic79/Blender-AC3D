@@ -379,7 +379,7 @@ class Poly (Object):
 		def write(self, ac_file):
 			surf_flags = self.ac_surf_flags.getFlags()
 			ac_file.write('SURF {0:#X}\n'.format(surf_flags))
-			ac_file.write('mat {0}\n'.format(self.mat))
+			ac_file.write('mat {0}\n'.format(self.mat-self.export_config.mat_offset))
 			ac_file.write('refs {0}\n'.format(len(self.bl_face.vertices)))
 
 			r = range(len(self.bl_face.vertices))
@@ -413,6 +413,8 @@ class Poly (Object):
 				#is edge
 				self.ac_surf_flags.smooth_shaded = True
 				self.ac_surf_flags.twosided = True
+			if self.mat == 0:
+				self.export_config.mat_offset = 0
 		
 		class SurfaceFlags:
 			def __init__( self,
@@ -479,6 +481,8 @@ class Material:
 		self.shi = 10										# integer
 		self.trans = 0									# float
 		self.merge = False
+		self.default = True
+		self.export_config = export_config
 
 		if bl_mat:
 			# Blender:
@@ -501,7 +505,8 @@ class Material:
 			# specular           : 0-1 vector
 			# shininess          : 0-128
 			# transparency       : 0-1
-			#		
+			#	
+			self.default = False	
 			self.name = re.sub('["]', '', bl_mat.name) # remove any " from the name.
 			self.rgb = bl_mat.diffuse_intensity * bl_mat.diffuse_color
 			if export_config.mircol_as_amb:
@@ -530,18 +535,21 @@ class Material:
 
 	def write( self, strm ):
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
-
-		strm.write('MATERIAL "{0}" rgb {1:.4f} {2:.4f} {3:.4f}  amb {4:.4f} {5:.4f} {6:.4f}  emis {7:.4f} {8:.4f} {9:.4f}  spec {10:.4f} {11:.4f} {12:.4f}  shi {13} trans {14:.4f}\n'.format(
+		if not (self.default and self.export_config.mat_offset == 1):
+			strm.write('MATERIAL "{0}" rgb {1:.3f} {2:.3f} {3:.3f}  amb {4:.3f} {5:.3f} {6:.3f}  emis {7:.3f} {8:.3f} {9:.3f}  spec {10:.3f} {11:.3f} {12:.3f}  shi {13} trans {14:.3f}\n'.format(
 							self.name,
-							self.rgb[0], self.rgb[1], self.rgb[2],
-							self.amb[0], self.amb[1], self.amb[2],
-							self.emis[0], self.emis[1], self.emis[2],
-							self.spec[0], self.spec[1], self.spec[2],
+							round(self.rgb[0],3), round(self.rgb[1],3), round(self.rgb[2],3),
+							round(self.amb[0],3), round(self.amb[1],3), round(self.amb[2],3),
+							round(self.emis[0],3), round(self.emis[1],3), round(self.emis[2],3),
+							round(self.spec[0],3), round(self.spec[1],3), round(self.spec[2],3),
 							self.shi,
-							self.trans,
+							round(self.trans,3),
 							))
 
 	def same_as( self, rhs ):
+		if self.default or rhs.default:
+			# Do not compare with DefaultWhite, as we might not output it.
+			return False
 		if self.merge:
 			return  self._feq(self.rgb[0], rhs.rgb[0]) and \
 						self._feq(self.rgb[1], rhs.rgb[1]) and \

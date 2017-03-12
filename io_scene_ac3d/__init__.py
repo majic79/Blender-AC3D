@@ -230,20 +230,10 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							description="Export selected objects only",
 							default=False,
 							)
-#	skip_data = BoolProperty(
-#							name="Skip Data",
-#							description="don't export mesh names as data fields",
-#							default=False,
-#							)
-#	global_coords = BoolProperty(
-#							name="Global Co-ordinates",
-#							description="Transform all vertices of all meshes to global coordinates",
-#							default=False,
-#							)
 	merge_materials = BoolProperty(
 							name="Merge materials",
 							description="merge materials that are identical",
-							default=True,
+							default=False,
 							)
 	mircol_as_emis = BoolProperty(
 							name="Mirror col as Emis",
@@ -267,7 +257,7 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 						)
 	export_lights = BoolProperty(
 							name="Export lights",
-							description="With this checked lights will also be exported. Notice they will all become pointlights.",
+							description="With this checked lights will also be exported. Notice they will all become pointlights. If not checked, any geometry that might have lamps as parent wont be output.",
 							default=False,
 						)
 	crease_angle = FloatProperty(

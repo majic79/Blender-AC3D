@@ -74,6 +74,7 @@ class ExportConf:
 		self.export_hidden = export_hidden
 		self.export_rot    = export_rot
 		self.export_lights = export_lights
+		self.mat_offset    = 1# if any mesh has no material, this will be changed to 0 and DefaultWhite will be output.
 
 		# used to determine relative file paths
 		self.exportdir = os.path.dirname(filepath)
@@ -118,7 +119,7 @@ class ExportAC3D:
 
 			#TRACE("Global: {0}".format(global_matrix))
 
-			self.ac_mats = [AC3D.Material()]
+			self.ac_mats = [AC3D.Material('DefaultWhite', None, self.export_conf)]
 			self.ac_world = None
 
 			# Parsing the tree in a top down manner and check on the way down which
