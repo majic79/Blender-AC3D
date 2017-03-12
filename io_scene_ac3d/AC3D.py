@@ -41,15 +41,12 @@ class Object:
 		if bl_obj:
 			self.hidden = bl_obj.hide
 			self.matrix_world = bl_obj.matrix_world
-			#self.pos_abs = self.matrix_world.to_translation()
 			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_local   # _basis
 			self.location = localMatrix.to_translation() #bl_obj.location#
 			self.rotation = localMatrix.to_3x3()
 		else:
 			self.location = None
 			self.rotation = None
-			#self.matrix_world = local_transform
-			#self.pos_abs = None
 
 		self.children = []
 		self.parent = None
@@ -281,8 +278,6 @@ class Poly (Object):
 		transform.identity()
 		if not self.export_config.export_rot:
 			transform = self.export_config.global_matrix.to_4x4() * self.matrix_world
-		#* Matrix.Translation(-self.pos_abs)\
-		#					* self.matrix_world
 		self.vertices = [transform * v.co for v in mesh.vertices]
 		
 	def _parseFaces( self, mesh ):

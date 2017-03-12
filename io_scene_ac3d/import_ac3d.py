@@ -336,12 +336,6 @@ class AcObj:
 		rearranged[1][2] = temp[2][1]
 		rearranged[2][2] = temp[2][2]
 		self.rotation = rearranged
-#		TODO check
-#		rotation = mathutils.Matrix(( [float(x) for x in toks[1:4]],
-#		                              [float(x) for x in toks[4:7]],
-#		                              [float(x) for x in toks[7:10]] )).to_quaternion()
-#		rotation.axis = self.import_config.global_matrix * rotation.axis
-#		self.rotation = rotation.to_matrix()
 		return False
 
 	def read_texture(self, ac_file, toks):
@@ -512,8 +506,6 @@ class AcObj:
 		if self.bl_obj:
 			self3 = mathutils.Matrix.Translation(self.location)
 			self4 = self.rotation.to_4x4()
-			#self.bl_obj.rotation_euler = self.rotation.to_euler()
-			#self.bl_obj.location = self.location
 			self.bl_obj.matrix_basis = self3 * self4
 
 			if self.ac_parent and self.ac_parent.type.lower() == 'world':

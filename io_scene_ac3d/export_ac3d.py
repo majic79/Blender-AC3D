@@ -64,8 +64,6 @@ class ExportConf:
 		self.global_matrix = global_matrix
 		self.use_selection = use_selection
 		self.use_render_layers = use_render_layers
-#		self.skip_data = skip_data
-#		self.global_coords = global_coords
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
 		self.crease_angle = crease_angle
@@ -135,7 +133,6 @@ class ExportAC3D:
 			for ac_mat in self.ac_mats:
 				ac_mat.write(ac_file)
 
-			#self.ac_world.write_ac_output(ac_file)
 			self.world.write(ac_file)
 			ac_file.close()
 
@@ -164,7 +161,6 @@ class ExportAC3D:
 				ob.hide = hidden
 				# We need to check for dupligroups first as every type of object can be
 				# converted to a dupligroup without removing the data from the old type.
-				#print(ob.name+': '+ob.type+' '+ob.dupli_type)
 				if ob.dupli_type == 'GROUP':
 					ac_ob = AC3D.Group(ob.name, ob, self.export_conf, local_transform)
 					children = [child for child in ob.dupli_group.objects
