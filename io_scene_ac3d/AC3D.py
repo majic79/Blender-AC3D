@@ -98,7 +98,6 @@ class Object:
 		if self.rotation and self.export_config.export_rot:
 			# rotation/scale relative to parent
 			exportMatrix = self.rotation.to_3x3()
-			print(exportMatrix)
 			if exportMatrix != Matrix().to_3x3():
 				strm.write('rot {0:.7f} {1:.7f} {2:.7f} {3:.7f} {4:.7f} {5:.7f} {6:.7f} {7:.7f} {8:.7f}\n'.format(exportMatrix[0][0], exportMatrix[1][0], exportMatrix[2][0], exportMatrix[0][1], exportMatrix[1][1], exportMatrix[2][1], exportMatrix[0][2], exportMatrix[1][2], exportMatrix[2][2]))
 
@@ -342,7 +341,7 @@ class Poly (Object):
 			strm.write('numvert {0}\n'.format(len(self.vertices)))
 			for vert in self.vertices:
 				x = round(vert[0],5)
-				y = round(vert[1],5)
+				y = round(vert[1],5) # with more than 5 digits the Blnder internal float representation becomes unreliable. Like 1 can become 0.999999 and stuff.
 				z = round(vert[2],5)
 				strm.write('{0:.5f} {1:.5f} {2:.5f}\n'.format(x, y, z))
 
@@ -385,7 +384,7 @@ class Poly (Object):
 				for n in r:
 					surf_ref = self.bl_face.vertices[n]
 					uv_ref = self.uv_coords[n]
-					u = round(uv_ref[0], 6)
+					u = round(uv_ref[0], 6) # Blender seems to use doubles internally here, so more than 5 digits is okay.
 					v = round(uv_ref[1], 6)
 					ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, u, v))
 			else:
