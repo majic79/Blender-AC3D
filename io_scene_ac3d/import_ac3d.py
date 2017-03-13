@@ -211,6 +211,7 @@ class AcObj:
 		self.tex_name = ''			# texture name (filename of texture)
 		self.texrep = [1,1]			# texture repeat
 		self.texoff = [0,0]			# texture offset
+		self.subdiv = 0             # subdivision modifier
 		self.location = [0,0,0]			# translation location of the center relative to the parent object
 		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))	# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
@@ -502,6 +503,15 @@ class AcObj:
 
 			me.show_double_sided = two_sided_lighting
 			self.bl_obj.show_transparent = self.import_config.display_transparency
+
+			# apply subdivision modifier
+			if self.subdiv != 0:
+				subName = self.name+".subdiv"
+				self.bl_obj.modifiers.new(subName, type='SUBSURF')
+				self.bl_obj.modifiers[subName].levels = self.subdiv
+				self.bl_obj.modifiers[subName].render_levels = self.subdiv
+				self.bl_obj.modifiers[subName].subdivision_type = 'CATMULL_CLARK'
+				self.bl_obj.modifiers[subName].use_subsurf_uv = True
 
 		if self.bl_obj:
 			self3 = mathutils.Matrix.Translation(self.location)

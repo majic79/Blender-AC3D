@@ -22,7 +22,6 @@ Go to File->Import->AC3D (.ac), select a file and let it do the work
 In latest Blender versions mirror color is white per default, and that confused many users that what they exported would get totally emissive per default.
 
 ##Known Issues:
-Token 'subdiv' is ignored.
 
 ##Things to come:
 * I want to have an option to overwrite, or to prompt the operator if they want to overwrite textures on an export
