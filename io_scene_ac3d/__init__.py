@@ -107,52 +107,52 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 							default='Y',
 						)
 
-	use_transparency = BoolProperty(
-							name="Use Transparency",
-							description="Enable transparency for rendering if material alpha < 1.0",
-							default=True,
-						)
+#	use_transparency = BoolProperty(
+#							name="Use Transparency",
+#							description="Set transparency in Blender materials. If unchecked, no objects will have any transparency set.",
+#							default=True,
+#						)
 
 	transparency_method = EnumProperty(
 							name="Transparency Method",
+							description="The transparency method that will be set in materials.",
 							items=(('MASK', "Mask", ""),
-								('Z_TRANSPARENCY', "Z_Transp", ""),
+								('Z_TRANSPARENCY', "Z Transparency", ""),
 								('RAYTRACE', "RayTrace", ""),
 							),
 							default='Z_TRANSPARENCY',
 						)
-
-	use_auto_smooth = BoolProperty(
-							name="Auto Smooth",
-							description="Use object auto smooth if normal angles are beneath Crease angle",
-							default=True,
-						)
+#	use_auto_smooth = BoolProperty(
+#							name="Auto Smooth",
+#							description="Use object auto smooth if normal angles are beneath Crease angle",
+#							default=True,
+#						)
 	use_emis_as_mircol = BoolProperty(
 							name="Use Emis as Mirror colour",
-							description="Use Emission colour as Mirror colour",
+							description="Set AC3D Emission colour from Blender Mirror colour",
 							default=False,
 						)
 
 	use_amb_as_mircol = BoolProperty(
 							name="Use Amb as Mirror colour",
-							description="Use Ambient colour as Mirror colour",
+							description="Set AC3D Ambient colour from Blender Mirror colour",
 							default=False,
 						)
-	display_transparency = BoolProperty(
-							name="Display Transparency",
-							description="Display transparency in main display",
-							default=True,
-						)
+#	display_transparency = BoolProperty(
+#							name="Transparency",
+#							description="If unchecked, no objects will display any transparency.",
+#							default=True,
+#						)
 	display_textured_solid = BoolProperty(
 							name="Display textured solid",
-							description="Show main window with textures applied (transparency works in only in normal direction)",
+							description="Show textures applied when in Solid view (notice that transparency for materials is then only seen in Material view and Render view)",
 							default=False,
 						)
-	hide_hidden_objects = BoolProperty(
-							name="Hide hidden objects",
-							description="Newer AC3D format supports hidding objects. If checked those objects will be Restrict viewport visibility in Blender.",
-							default=False,
-						)
+#	hide_hidden_objects = BoolProperty(
+#							name="Hide hidden objects",
+#							description="Newer AC3D format supports hiding objects. If checked those objects will be Restrict viewport visibility in Blender (wont be seen until the small eye in Outliner is clicked).",
+#							default=True,
+#						)
 
 	def execute(self, context):
 		from . import import_ac3d
@@ -232,27 +232,27 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							)
 	merge_materials = BoolProperty(
 							name="Merge materials",
-							description="merge materials that are identical",
+							description="Merge materials that are identical",
 							default=False,
 							)
 	mircol_as_emis = BoolProperty(
 							name="Mirror col as Emis",
-							description="export mirror colour as emissive colour",
+							description="Export Blender mirror colour as AC3D emissive colour",
 							default=False,
 							)
 	mircol_as_amb = BoolProperty(
 							name="Mirror col as Amb",
-							description="export mirror colour as ambient colour",
+							description="Export Blender mirror colour as AC3D ambient colour",
 							default=False,
 							)
 	export_lines = BoolProperty(
-							name="Export lines also",
+							name="Export lines",
 							description="Export standalone edges, bezier curves etc. as AC3D lines. Will make export take longer.",
 							default=False,
 							)
 	export_hidden = BoolProperty(
 							name="Export hidden objects",
-							description="Newer AC3D format supports hidding objects. If checked those objects will be exported as hidden. (notice that in engines with older importers they might show up)",
+							description="Newer AC3D format supports hiding objects. If checked those objects will be exported as hidden. (notice that in older loaders they might show up, or the loader might choke on those new tokens)",
 							default=False,
 						)
 	export_lights = BoolProperty(

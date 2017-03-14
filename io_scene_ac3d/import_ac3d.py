@@ -118,7 +118,7 @@ class AcMat:
 
 		bl_mat.alpha = 1.0 - self.trans
 		#if bl_mat.alpha < 1.0: this is disabled cause texture may need transparency to be set, even if material is opaque.
-		bl_mat.use_transparency = self.import_config.use_transparency
+		bl_mat.use_transparency = True#self.import_config.use_transparency
 		bl_mat.transparency_method = self.import_config.transparency_method
 		
 		return bl_mat
@@ -215,8 +215,9 @@ class AcObj:
 		self.location = [0,0,0]			# translation location of the center relative to the parent object
 		self.rotation = mathutils.Matrix(([1,0,0],[0,1,0],[0,0,1]))	# 3x3 rotational matrix for vertices
 		self.url = ''				# url of the object (??!)
-		self.crease = 61			# crease angle for smoothing
-		self.vert_list = []				# list of Vector(X,Y,Z) objects
+		self.crease = 61			# crease angle for smoothing, 61 degs was chosen since that is what OSG uses as default
+		self.use_crease = False     # if crease was specified in the AC3D file
+		self.vert_list = []			# list of Vector(X,Y,Z) objects
 		self.surf_list = []			# list of attached surfaces
 		self.face_list = []			# flattened surface list
 		self.surf_face_list = []    # list of surfs that is faces, no edges
@@ -311,7 +312,7 @@ class AcObj:
 		# hidden: If an object should have restricted viewport visibility.
 		# locked: Blender does not support locking of entire object.
 		# folded: Blender API does not allow access to to this.
-		if toks[0] == "hidden" and self.import_config.hide_hidden_objects == True:
+		if toks[0] == "hidden":# and self.import_config.hide_hidden_objects == True:
 			self.hidden = True
 		return False
 
@@ -358,6 +359,7 @@ class AcObj:
 
 	def read_crease(self, ac_file, toks):
 		self.crease=float(toks[1])
+		self.use_crease = True
 		return False
 
 	def read_children(self, ac_file, toks):
@@ -420,8 +422,7 @@ class AcObj:
 
 		# make sure we have something to work with
 		if self.vert_list and me:
-
-			me.use_auto_smooth = self.import_config.use_auto_smooth
+			me.use_auto_smooth = self.use_crease#self.import_config.use_auto_smooth
 			me.auto_smooth_angle = radians(self.crease)
 			two_sided_lighting = False
 			has_uv = False
@@ -502,7 +503,7 @@ class AcObj:
 							uv_pointer += len(surf.uv_refs)
 
 			me.show_double_sided = two_sided_lighting
-			self.bl_obj.show_transparent = self.import_config.display_transparency
+			self.bl_obj.show_transparent = True#self.import_config.display_transparency
 
 			# apply subdivision modifier
 			if self.subdiv != 0:
@@ -657,27 +658,23 @@ class ImportConf:
 			context,
 			filepath,
 			global_matrix,
-			use_transparency,
 			transparency_method,
-			use_auto_smooth,
 			use_emis_as_mircol,
 			use_amb_as_mircol,
-			display_transparency,
 			display_textured_solid,
-			hide_hidden_objects,
 			):
 		# Stuff that needs to be available to the working classes (ha!)
 		self.operator = operator
 		self.context = context
 		self.global_matrix = global_matrix
-		self.use_transparency = use_transparency
+#		self.use_transparency = use_transparency
 		self.transparency_method = transparency_method
-		self.use_auto_smooth = use_auto_smooth
+#		self.use_auto_smooth = use_auto_smooth
 		self.use_emis_as_mircol = use_emis_as_mircol
 		self.use_amb_as_mircol = use_amb_as_mircol
-		self.display_transparency = display_transparency
+#		self.display_transparency = display_transparency
 		self.display_textured_solid = display_textured_solid
-		self.hide_hidden_objects = hide_hidden_objects
+#		self.hide_hidden_objects = hide_hidden_objects
 
 		# used to determine relative file paths
 		self.importdir = os.path.dirname(filepath)
@@ -692,14 +689,10 @@ class ImportAC3D:
 			filepath="",
 			use_image_search=False,
 			global_matrix=None,
-			use_transparency=True,
 			transparency_method='Z_TRANSPARENCY',
-			use_auto_smooth=True,
 			use_emis_as_mircol=True,
 			use_amb_as_mircol=False,
-			display_transparency=True,
 			display_textured_solid=False,
-			hide_hidden_objects=False,
 			):
 
 		self.import_config = ImportConf(
@@ -707,14 +700,10 @@ class ImportAC3D:
 										context,
 										filepath,
 										global_matrix,
-										use_transparency,
 										transparency_method,
-										use_auto_smooth,
 										use_emis_as_mircol,
 										use_amb_as_mircol,
-										display_transparency,
 										display_textured_solid,
-										hide_hidden_objects,
 										)
 
 
