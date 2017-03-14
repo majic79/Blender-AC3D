@@ -1,4 +1,4 @@
-#Blender-AC3D - Version 2.12
+#Blender-AC3D - Version 2.14
 
 ##What is it?
 It's a few python scripts to import/export Inivis AC3D data into and out of Blender 2.63+. For earlier Blender 2.6x versions you need an older revision of the plugin (https://github.com/majic79/Blender-AC3D/tree/BL2.62)
@@ -29,6 +29,10 @@ In latest Blender versions mirror color is white per default, and that confused 
 ##Follow the discussion at:
 
 http://www.flightgear.org/forums/viewtopic.php?f=18&t=13442
+
+##Complete file format specification, anno 2017
+
+https://sites.google.com/view/ac3dfileformat/home
 
 ##Acknowledgments:
 

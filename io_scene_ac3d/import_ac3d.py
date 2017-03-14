@@ -117,9 +117,9 @@ class AcMat:
 		bl_mat.specular_hardness = int(round((((float(self.shi) - acMin) * blRange) / acRange) + blMin, 0))
 
 		bl_mat.alpha = 1.0 - self.trans
-		if bl_mat.alpha < 1.0:
-			bl_mat.use_transparency = self.import_config.use_transparency
-			bl_mat.transparency_method = self.import_config.transparency_method
+		#if bl_mat.alpha < 1.0: this is disabled cause texture may need transparency to be set, even if material is opaque.
+		bl_mat.use_transparency = self.import_config.use_transparency
+		bl_mat.transparency_method = self.import_config.transparency_method
 		
 		return bl_mat
 
