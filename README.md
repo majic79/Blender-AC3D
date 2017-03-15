@@ -1,4 +1,4 @@
-#Blender-AC3D - Version 2.16
+#Blender-AC3D - Version 2.17
 
 ##What is it?
 It's a few python scripts to import/export Inivis AC3D data into and out of Blender 2.63+. For earlier Blender 2.6x versions you need an older revision of the plugin (https://github.com/majic79/Blender-AC3D/tree/BL2.62)
