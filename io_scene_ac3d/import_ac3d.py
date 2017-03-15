@@ -468,8 +468,10 @@ class AcObj:
 								fm_index = 0
 						self.face_mat_list.append(fm_index)
 				else:
-					# treating as a polyline (nothing more to do)
-					pass
+					# treating as a polyline
+					# If one surface is twosided, they all will be...
+					two_sided_lighting |= surf.flags.two_sided
+
 			#print(len(self.vert_list))
 			me.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
@@ -480,6 +482,34 @@ class AcObj:
 					poly.use_smooth = True
 				else:
 					poly.use_smooth = False
+
+			# set smooth flag and apply material to each edge (disabled as edges cannot be assigned material or smooth in Blender)
+			if 1 == 0 and len(self.edge_list) > 0:
+				# Standalone edges without faces.
+				#
+				# notice that an edge_key is actually a pair of indices to vertices
+				#
+				faceEdgeKeys = set([])
+				for poly in me.polygons:
+					for key in poly.edge_keys:
+						faceEdgeKeys.add(key)
+				
+				allEdgeKeys  = set( me.edge_keys )
+				freeEdgeKeys = allEdgeKeys.difference( faceEdgeKeys )
+				#print(str(len(faceEdgeKeys))+' '+str(len(allEdgeKeys))+' '+str(len(freeEdgeKeys)))
+
+				freeEdges = set([])
+				for f_edge in freeEdgeKeys:
+					for b_edge in me.edges:
+						if b_edge.key == f_edge:
+							freeEdges.add(b_edge)
+
+				for no, edge in enumerate(freeEdges):
+					edge.material_index = self.line_mat_list[no]
+					if self.surf_line_list[no].flags.shaded == True:
+						edge.use_smooth = True
+					else:
+						edge.use_smooth = False
 
 			# apply UV map
 			if has_uv:
@@ -501,6 +531,18 @@ class AcObj:
 								
 								uvtex.data[i].image = surf_material.texture_slots[0].texture.image
 							uv_pointer += len(surf.uv_refs)
+# uvtexdata does not contain data on lines, so lines cannot be applied UV, sadly
+#					for i, edge in enumerate(self.line_list):
+#						line = self.surf_line_list[i]
+#
+#						for vert_index in range(len(line.uv_refs)):
+#							uvtexdata[uv_pointer+vert_index].uv = [line.uv_refs[vert_index][0]*self.texrep[0]+self.texoff[0], line.uv_refs[vert_index][1]*self.texrep[1]+self.texoff[1]]
+#						if len(self.tex_name):
+#							# we do the check here to allow for import of UV without texture
+#							line_material = me.materials[self.face_mat_list[i]]
+#							
+#							uvtex.data[i].image = line_material.texture_slots[0].texture.image
+#						uv_pointer += len(line.uv_refs)
 
 			me.show_double_sided = two_sided_lighting
 			self.bl_obj.show_transparent = True#self.import_config.display_transparency

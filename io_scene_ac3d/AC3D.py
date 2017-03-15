@@ -318,15 +318,26 @@ class Poly (Object):
 		if self.ex_conf.export_lines:
 			# Standalone edges without faces.
 			#
-			faceEdges = set( [ edge for face in mesh.polygons for edge_keys in face.edge_keys for edge in edge_keys] )
-			allEdges  = set( range( len( mesh.edges ) ) )
-			freeEdges = allEdges.difference( faceEdges )
+			# notice that an edge_key is actually a pair of indices to vertices
+			#
+			faceEdgeKeys = set([])
+			for poly in mesh.polygons:
+				for key in poly.edge_keys:
+					faceEdgeKeys.add(key)
+			
+			allEdgeKeys  = set( mesh.edge_keys )
+			freeEdgeKeys = allEdgeKeys.difference( faceEdgeKeys )
+			#print(str(len(faceEdgeKeys))+' '+str(len(allEdgeKeys))+' '+str(len(freeEdgeKeys)))
 
-			for edge_idx in freeEdges:
-				bl_edge = mesh.edges[edge_idx]
-				
-				edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
-				self.surfaces.append(edge)
+			freeEdges = set([])
+			for f_edge in freeEdgeKeys:
+				for b_edge in mesh.edges:
+					if b_edge.key == f_edge:
+						freeEdges.add(b_edge)
+
+			for bl_edge in freeEdges:
+				ac_edge = self.Surface(self.export_config, bl_edge, self.ac_mats, mesh.show_double_sided, is_flipped, None, 2)
+				self.surfaces.append(ac_edge)
 
 		
 	def _write( self, strm ):
@@ -393,6 +404,7 @@ class Poly (Object):
 					ac_file.write('{0} 0 0\n'.format(surf_ref))
 
 		def parse_blender_face(self, bl_face, ac_mats):
+			self.ac_surf_flags.twosided = self.is_two_sided
 
 			try:
 				if bl_face.material_index in ac_mats:
@@ -400,13 +412,12 @@ class Poly (Object):
 			except:
 				#is edge
 				self.mat = 0
+			
 			try:
 				self.ac_surf_flags.smooth_shaded = bl_face.use_smooth
-				self.ac_surf_flags.twosided = self.is_two_sided
 			except:
 				#is edge
 				self.ac_surf_flags.smooth_shaded = True
-				self.ac_surf_flags.twosided = True
 			if self.mat == 0:
 				self.export_config.mat_offset = 0
 		
