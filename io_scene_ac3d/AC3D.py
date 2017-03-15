@@ -412,6 +412,10 @@ class Poly (Object):
 			except:
 				#is edge
 				self.mat = 0
+				if len(ac_mats) == 1:
+					# we only assign a material to a line if only 1 material is present in the mesh.
+					for val in ac_mats.values():
+						self.mat = val
 			
 			try:
 				self.ac_surf_flags.smooth_shaded = bl_face.use_smooth

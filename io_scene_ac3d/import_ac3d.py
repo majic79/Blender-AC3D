@@ -469,9 +469,21 @@ class AcObj:
 						self.face_mat_list.append(fm_index)
 				else:
 					# treating as a polyline
-					# If one surface is twosided, they all will be...
 					two_sided_lighting |= surf.flags.two_sided
 
+					# Material index is 1 based, the list we built is 0 based
+					ac_material = ac_matlist[surf.mat_index]
+					bl_material = ac_material.get_blender_material(self.texrep, self.tex_name)
+
+					if bl_material == None:
+						TRACE("Error getting material {0} '{1}'".format(surf.mat_index, self.tex_name))
+
+					if not bl_material.name in me.materials:
+						# we here add the lines material to the object, but does never assign it to any edges.
+						# reason is edges cannot have material assigned.
+						# only reason we add it is in case the object only contains edges,
+						# so when exporting, that material (if there is only 1) will be assigned to every edge in the object.
+						me.materials.append(bl_material)
 			#print(len(self.vert_list))
 			me.from_pydata(self.vert_list, self.edge_list, self.face_list)
 
