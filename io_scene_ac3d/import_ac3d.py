@@ -598,6 +598,7 @@ class AcObj:
 		# Add any children
 		str_pre_new = ""
 		bUseLink = True
+		children = []
 		for obj in self.children:
 			if bLevelLinked:
 				str_pre_new = str_pre + "| "
@@ -607,13 +608,22 @@ class AcObj:
 			if self.children.index(obj) == len(self.children)-1:
 				bUseLink = False
 
-			obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
+			child = obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
+			if child and len(child) == 1:
+				children.append(child[0])
 
 
 		if me:
 #			me.calc_normals()
 			me.validate()
 			me.update(calc_edges=True)
+
+		if self.bl_obj:
+			# return it so that if its top-level it can be selected.
+			return [self.bl_obj]
+		else:
+			# if world then return all top level children:
+			return children
 
 
 class AcSurf:
@@ -969,10 +979,14 @@ class ImportAC3D:
 
 		# go through the list of objects
 		bUseLink = True
+		top_level_objects = []
 		for obj in self.oblist:
 			if self.oblist.index(obj) == len(self.oblist)-1:
 				bUseLink = False
-			obj.create_blender_object(self.matlist, "", bUseLink)
+			tlo = obj.create_blender_object(self.matlist, "", bUseLink)
+			if len(tlo) > 0:
+				for tloc in tlo:
+					top_level_objects.append(tloc)
 
 		for obj in bpy.context.scene.objects:
 			if obj.matrix_basis.is_negative:
@@ -980,3 +994,9 @@ class ImportAC3D:
 				obj.select = True
 				bpy.context.scene.objects.active = obj
 				bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+		for obj in bpy.data.objects:
+			obj.select = False
+		for obj in top_level_objects:
+			# imported top level objects will be selected
+			obj.select = True
