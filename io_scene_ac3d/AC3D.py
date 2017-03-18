@@ -93,7 +93,10 @@ class Object:
 			# position relative to parent
 			location = self.location
 			if any(c != 0 for c in location):
-				strm.write('loc {0:.7f} {1:.7f} {2:.7f}\n'.format(location[0], location[1], location[2]))
+				x = '{0:.7f}'.format(location[0]).rstrip('0').rstrip('.')
+				y = '{0:.7f}'.format(location[1]).rstrip('0').rstrip('.')
+				z = '{0:.7f}'.format(location[2]).rstrip('0').rstrip('.')
+				strm.write('loc {0:s} {1:s} {2:s}\n'.format(x,y,z))
 
 		if self.rotation and self.export_config.export_rot:
 			# rotation/scale relative to parent
@@ -351,10 +354,10 @@ class Poly (Object):
 		if len(self.vertices):
 			strm.write('numvert {0}\n'.format(len(self.vertices)))
 			for vert in self.vertices:
-				x = round(vert[0],5)
-				y = round(vert[1],5) # with more than 5 digits the Blnder internal float representation becomes unreliable. Like 1 can become 0.999999 and stuff.
-				z = round(vert[2],5)
-				strm.write('{0:.5f} {1:.5f} {2:.5f}\n'.format(x, y, z))
+				x = '{0:.5f}'.format(round(vert[0],5)).rstrip('0').rstrip('.')
+				y = '{0:.5f}'.format(round(vert[1],5)).rstrip('0').rstrip('.') # with more than 5 digits the Blnder internal float representation becomes unreliable. Like 1 can become 0.999999 and stuff.
+				z = '{0:.5f}'.format(round(vert[2],5)).rstrip('0').rstrip('.')
+				strm.write('{0:s} {1:s} {2:s}\n'.format(x, y, z))
 
 		if len(self.surfaces):
 			strm.write('numsurf {0}\n'.format(len(self.surfaces)))
@@ -395,9 +398,9 @@ class Poly (Object):
 				for n in r:
 					surf_ref = self.bl_face.vertices[n]
 					uv_ref = self.uv_coords[n]
-					u = round(uv_ref[0], 6) # Blender seems to use doubles internally here, so more than 5 digits is okay.
-					v = round(uv_ref[1], 6)
-					ac_file.write('{0} {1:.6f} {2:.6f}\n'.format(surf_ref, u, v))
+					u = '{0:.6f}'.format(round(uv_ref[0], 6)).rstrip('0').rstrip('.') # Blender seems to use doubles internally here, so more than 5 digits is okay.
+					v = '{0:.6f}'.format(round(uv_ref[1], 6)).rstrip('0').rstrip('.')
+					ac_file.write('{0} {1:s} {2:s}\n'.format(surf_ref, u, v))
 			else:
 				for n in r:
 					surf_ref = self.bl_face.vertices[n]
