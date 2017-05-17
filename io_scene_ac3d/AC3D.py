@@ -222,7 +222,10 @@ class Poly (Object):
 						# TODO: Optionally over-write existing textures
 						if not bl_im.has_data:
 							# sometimes it has data, but its just not updated.
-							bl_im.update()
+							try:
+								bl_im.update()
+							except RuntimeError:
+								print ("")
 						if bl_im.has_data:
 							if not os.path.exists(export_tex):
 								if bl_im.packed_file:
