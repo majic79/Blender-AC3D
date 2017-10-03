@@ -526,6 +526,8 @@ class Material:
 			self.rgb = bl_mat.diffuse_intensity * bl_mat.diffuse_color
 			if export_config.mircol_as_amb:
 				self.amb = bl_mat.mirror_color
+			elif export_config.amb_as_diff:
+				self.amb = self.rgb
 			else:
 				self.amb = [bl_mat.ambient, bl_mat.ambient, bl_mat.ambient]
 			if export_config.mircol_as_emis:

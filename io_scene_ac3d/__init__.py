@@ -34,7 +34,7 @@ bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "Inivis AC3D model exporter for blender.",
 	"author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr.",
-	"version": (2,19),
+	"version": (2,20),
 	"blender" : (2,6,0),
 	"api": 41098,
 	"location": "File > Import-Export",
@@ -128,14 +128,14 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 #							default=True,
 #						)
 	use_emis_as_mircol = BoolProperty(
-							name="Use Emis as Mirror colour",
-							description="Set AC3D Emission colour from Blender Mirror colour",
+							name="Set Emis to Mirror colour",
+							description="Set AC3D Emission colour into Blender Mirror colour",
 							default=False,
 						)
 
 	use_amb_as_mircol = BoolProperty(
-							name="Use Amb as Mirror colour",
-							description="Set AC3D Ambient colour from Blender Mirror colour",
+							name="Set Amb to Mirror colour",
+							description="Set AC3D Ambient colour into Blender Mirror colour",
 							default=False,
 						)
 #	display_transparency = BoolProperty(
@@ -236,13 +236,18 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 							default=False,
 							)
 	mircol_as_emis = BoolProperty(
-							name="Mirror col as Emis",
-							description="Export Blender mirror colour as AC3D emissive colour",
+							name="Mirror col to Emis",
+							description="Export Blender mirror colour to AC3D emissive colour",
 							default=False,
 							)
 	mircol_as_amb = BoolProperty(
-							name="Mirror col as Amb",
-							description="Export Blender mirror colour as AC3D ambient colour",
+							name="Mirror col to Amb",
+							description="Export Blender mirror colour to AC3D ambient colour",
+							default=False,
+							)
+	amb_as_diff = BoolProperty(
+							name="Amb same as Diff",
+							description="Export AC3D ambient colour to be like Diffuse color",
 							default=False,
 							)
 	export_lines = BoolProperty(

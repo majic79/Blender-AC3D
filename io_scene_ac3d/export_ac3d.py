@@ -53,6 +53,7 @@ class ExportConf:
 			merge_materials,
 			mircol_as_emis,
 			mircol_as_amb,
+			amb_as_diff,
 			export_lines,
 			export_hidden,
 			export_lights,
@@ -66,6 +67,7 @@ class ExportConf:
 		self.use_render_layers = use_render_layers
 		self.mircol_as_emis = mircol_as_emis
 		self.mircol_as_amb = mircol_as_amb
+		self.amb_as_diff   = amb_as_diff
 		self.crease_angle = crease_angle
 		self.merge_materials = merge_materials
 		self.export_lines = export_lines
@@ -92,6 +94,7 @@ class ExportAC3D:
 			merge_materials=False,
 			mircol_as_emis=True,
 			mircol_as_amb=False,
+			amb_as_diff=False,
 			export_lines=False,
 			export_hidden=False,
 			export_lights=False,
@@ -109,6 +112,7 @@ class ExportAC3D:
 										merge_materials,
 										mircol_as_emis,
 										mircol_as_amb,
+										amb_as_diff,
 										export_lines,
 										export_hidden,
 										export_lights,
