@@ -24,6 +24,7 @@ import bpy
 import csv
 import mathutils
 import re
+import shlex
 from mathutils import Vector, Euler
 from math import radians
 from bpy import *
@@ -878,7 +879,7 @@ class ImportAC3D:
 				line = self.readLine(ac_file)
 				if line != None:
 					line = line.strip()
-					line = line.split()
+					line = shlex.split(line)
 				
 					# See if this is a valid token and pass the file handle and the current line to our function
 					if line[0] in self.tokens.keys():
@@ -909,7 +910,8 @@ class ImportAC3D:
 	def read_mat_line(self, ac_file):
 		line = self.readLine(ac_file)
 		if line != None:
-			line = line.split()
+			#line = line.split()
+			line = shlex.split(line)
 		else:
 			self.report_error("unexpected end of file in materials")
 		return line
