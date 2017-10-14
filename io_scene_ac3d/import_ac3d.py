@@ -393,7 +393,7 @@ class AcObj:
 	'''
 	This function does the work of creating an object in blender and configuring it correctly
 	'''
-	def create_blender_object(self, ac_matlist, str_pre, bLevelLinked):
+	def create_blender_object(self, ac_matlist, str_pre, bLevelLinked, mainSelf):
 		if self.type.lower() == 'world':
 			self.name = self.import_config.ac_name
 			
@@ -609,7 +609,7 @@ class AcObj:
 			if self.children.index(obj) == len(self.children)-1:
 				bUseLink = False
 
-			child = obj.create_blender_object(ac_matlist, str_pre_new, bUseLink)
+			child = obj.create_blender_object(ac_matlist, str_pre_new, bUseLink, mainSelf)
 			if child and len(child) == 1:
 				children.append(child[0])
 
@@ -621,6 +621,7 @@ class AcObj:
 
 		if self.bl_obj:
 			# return it so that if its top-level it can be selected.
+			mainSelf.fullList.append(self.bl_obj)
 			return [self.bl_obj]
 		else:
 			# if world then return all top level children:
@@ -979,18 +980,20 @@ class ImportAC3D:
 	'''
 	def create_blender_data(self):
 
+		self.fullList = [];
+
 		# go through the list of objects
 		bUseLink = True
 		top_level_objects = []
 		for obj in self.oblist:
 			if self.oblist.index(obj) == len(self.oblist)-1:
 				bUseLink = False
-			tlo = obj.create_blender_object(self.matlist, "", bUseLink)
+			tlo = obj.create_blender_object(self.matlist, "", bUseLink, self)
 			if len(tlo) > 0:
 				for tloc in tlo:
 					top_level_objects.append(tloc)
 
-		for obj in bpy.context.scene.objects:
+		for obj in self.fullList:# only traverse what we import, not what is already in Blender
 			if obj.matrix_basis.is_negative:
 				# when negative scaling is applied, normals might be flipped, so we apply the scaling in those cases.
 				obj.select = True
