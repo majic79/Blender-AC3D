@@ -262,7 +262,7 @@ class AcObj:
 			line = self.world.readLine(ac_file)
 			if line == None:
 				break
-			toks = line.strip().split()
+			toks = shlex.split(line.strip())
 			if len(toks)>0:
 				if toks[0] in self.tokens.keys():
 					bDone = self.tokens[toks[0]](ac_file,toks)
