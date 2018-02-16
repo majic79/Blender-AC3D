@@ -1,4 +1,4 @@
-# Blender-AC3D - Version 2.23
+# Blender-AC3D - Version 2.24
 
 ## What is it?
 It's a few python scripts to import/export Inivis AC3D data into and out of Blender 2.63+. For earlier Blender 2.6x versions you need an older revision of the plugin (https://github.com/majic79/Blender-AC3D/tree/BL2.62)
@@ -23,9 +23,13 @@ In latest Blender versions mirror color is white per default, and that confused 
 
 ## Known Issues:
 If exporting when in Edit mode, it will not export the last edits done in Edit mode. Best is to export when in Object mode.
+
 When importing lines, they cannot be assigned UV coordinates as Blender does not support that.
+
 When exporting lines, they will always be smooth shaded, due to limitations in Blender.
+
 When exporting lines they will have the DefaultWhite material, except if their Blender object has only 1 and only 1 material, then they will be assigned that. This is due to Blender limitation.
+
 Exporter will export all materials in object material slots, even if they are not referenced. Good if you had a material you might want to assign to something later. Also annoying cause it potentially can clutter up the AC3D file with unused materials.
 
 ## Things to come:

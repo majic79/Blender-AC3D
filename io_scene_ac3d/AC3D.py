@@ -41,7 +41,7 @@ class Object:
 		if bl_obj:
 			self.hidden = bl_obj.hide
 			self.matrix_world = bl_obj.matrix_world
-			localMatrix = bl_obj.matrix_parent_inverse * bl_obj.matrix_local   # _basis
+			localMatrix = bl_obj.matrix_local   # bl_obj.matrix_parent_inverse * bl_obj.matrix_local
 			self.location = localMatrix.to_translation() #bl_obj.location#
 			self.rotation = localMatrix.to_3x3()
 		else:
