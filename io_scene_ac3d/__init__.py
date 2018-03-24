@@ -34,7 +34,7 @@ bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "Inivis AC3D model exporter for Blender.",
 	"author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr.",
-	"version": (2,24),
+	"version": (2,25),
 	"blender" : (2,6,0),
 	"api": 41098,
 	"location": "File > Import-Export",
@@ -174,7 +174,48 @@ class ImportAC3D(bpy.types.Operator, ImportHelper):
 
 		return {'FINISHED'}
 
+#
+#   The error message operator. When invoked, pops up a dialog 
+#   window with the given message.   
+#
+class MessageOperator(bpy.types.Operator):
+    bl_idname = "error.message"
+    bl_label = "Message"
+    type = StringProperty()
+    message = StringProperty()
+ 
+    def execute(self, context):
+        self.report({'INFO'}, self.message)
+        print(self.message)
+        return {'FINISHED'}
+ 
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_popup(self, width=400, height=200)
+ 
+    def draw(self, context):
+        self.layout.label("A message has arrived")
+        row = self.layout.split(0.25)
+        row.prop(self, "type")
+        row.prop(self, "message")
+        row = self.layout.split(0.80)
+        row.label("") 
+        row.operator("error.ok")
+ 
+#
+#   The OK button in the error dialog
+#
+class OkOperator(bpy.types.Operator):
+    bl_idname = "error.ok"
+    bl_label = "OK"
+    def execute(self, context):
+        return {'FINISHED'}
+
+bpy.utils.register_class(OkOperator)
+bpy.utils.register_class(MessageOperator)
+
 class ExportAC3D(bpy.types.Operator, ExportHelper):
+
 	'''Export to AC3D file format (.ac)'''
 	bl_idname = 'export_scene.export_ac3d'
 	bl_label = 'Export AC3D'
@@ -280,6 +321,12 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 #							default=True,
 #							)
 	def execute(self, context):
+		if context.active_object.mode == 'EDIT':
+			print("AC3D was not exported due to being in edit mode.")
+			bpy.ops.error.message('INVOKE_DEFAULT', 
+				type = "Error",
+				message = 'Cannot export AC3D in edit mode.')
+			return {'FINISHED'}
 		from . import export_ac3d
 		keywords = self.as_keywords(ignore=("axis_forward",
 											"axis_up",

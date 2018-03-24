@@ -207,10 +207,13 @@ class Poly (Object):
 							tex_slot.texture_coords = 'UV'
 							#tex_slot.uv_layer = 
 						bl_tex = tex_slot.texture
-						bl_im = bl_tex.image
+						if bl_tex.type == 'IMAGE':
+							bl_im = bl_tex.image
+						else:
+							bl_im = None
 						if(bl_im == None):
-							print("Texture has no data (skipping): Tex name="+bl_tex.name+" Mat name="+bl_mat.name)
-							self.ex_conf.operator.report({'WARNING'}, 'AC3D Exporter: Texture "'+bl_tex.name+'" in material: "'+bl_mat.name+ '" contains no data and was not exported.')
+							print("Texture has no image data (skipping): Tex name="+bl_tex.name+" Mat name="+bl_mat.name)
+							self.ex_conf.operator.report({'WARNING'}, 'AC3D Exporter: Texture "'+bl_tex.name+'" in material: "'+bl_mat.name+ '" contains no image data and was not exported.')
 							continue
 						tex_name = bpy.path.basename(bl_im.filepath)
 						export_tex = os.path.join(self.export_config.exportdir, tex_name)
