@@ -34,7 +34,7 @@ bl_info = {
 	"name": "AC3D (.ac) format",
 	"description": "Inivis AC3D model exporter for Blender.",
 	"author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr.",
-	"version": (2,25),
+	"version": (2,26),
 	"blender" : (2,6,0),
 	"api": 41098,
 	"location": "File > Import-Export",
@@ -321,12 +321,13 @@ class ExportAC3D(bpy.types.Operator, ExportHelper):
 #							default=True,
 #							)
 	def execute(self, context):
-		if context.active_object.mode == 'EDIT':
-			print("AC3D was not exported due to being in edit mode.")
-			bpy.ops.error.message('INVOKE_DEFAULT', 
-				type = "Error",
-				message = 'Cannot export AC3D in edit mode.')
-			return {'FINISHED'}
+		if context.active_object:
+			if context.active_object.mode == 'EDIT':
+				print("AC3D was not exported due to being in edit mode.")
+				bpy.ops.error.message('INVOKE_DEFAULT', 
+					type = "Error",
+					message = 'Cannot export AC3D in edit mode.')
+				return {'FINISHED'}
 		from . import export_ac3d
 		keywords = self.as_keywords(ignore=("axis_forward",
 											"axis_up",
