@@ -10,7 +10,7 @@ Because in the migration from 2.4X to 2.5, it lost AC3D support. This mod aims t
 Yes, this is mainly a port of those files to enable the import/export of .ac files in blender 2.5
 
 ## How do I install it?
-open the blender/x.x/scripts/addons folder, then pull the io_scene_ac3d folder into the addons folder of blender. There's an alternative location you can drop it, at ~/.blender/x.x/scripts/addons (linux) or c:\Users\[username]\AppData\Roaming\Blender Foundation\Blender\x.x\scrips\addons (Windows 7+), where x.x is the version of Blender and [username] is the Windows user name.
+open the blender/x.x/scripts/addons folder, then pull the io_scene_ac3d folder into the addons folder of blender. There's an alternative location you can drop it, at ~/.blender/x.x/scripts/addons (linux) or c:\Users\[username]\AppData\Roaming\Blender Foundation\Blender\x.x\scripts\addons (Windows 7+), where x.x is the version of Blender and [username] is the Windows user name.
 
 ## I can't see it in the import/export menu!
 You'll need to enable the script in the user preferences window after installing it - open the user preferences window (File->User Preferences or Ctrl-Alt-U) and then go to the Add-on tab, click the button for Import-Export and then check the box on the right of "Import-Export: AC3D (.ac)"
