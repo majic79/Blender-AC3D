@@ -3,10 +3,10 @@
 ## What is it?
 It's a few python scripts to import/export Inivis AC3D data into and out of Blender 2.63 to Blender 2.79.
 
-##Blender 2.80
+## Blender 2.80
 For Blender 2.80 you will need a newer revision of the plugin (https://github.com/NikolaiVChr/Blender-AC3D/tree/2.80)
 
-##For earlier Blender 2.6x versions
+## For earlier Blender 2.6x versions
 For these you will need an older revision of the plugin (https://github.com/NikolaiVChr/Blender-AC3D/tree/BL2.62)
 
 ## Why blender 2.6/2.7?
