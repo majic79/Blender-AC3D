@@ -1,4 +1,4 @@
-# Blender-AC3D - Version 2.26
+# Blender-AC3D - Version 2.27
 
 ## What is it?
 It's a few python scripts to import/export Inivis AC3D data into and out of Blender 2.63 to Blender 2.79.
