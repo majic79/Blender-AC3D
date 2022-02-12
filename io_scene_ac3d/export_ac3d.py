@@ -134,8 +134,13 @@ class ExportAC3D:
 			# dump the contents of the lists to file
 			ac_file = open(filepath, 'w')
 			ac_file.write('AC3Db\n')
+			longestMat = 1
 			for ac_mat in self.ac_mats:
-				ac_mat.write(ac_file)
+				ml = len(ac_mat.name)
+				if ml > longestMat:
+					longestMat = ml
+			for ac_mat in self.ac_mats:
+				ac_mat.write(ac_file, longestMat)
 
 			self.world.write(ac_file)
 			ac_file.close()

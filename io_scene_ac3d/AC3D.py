@@ -553,11 +553,14 @@ class Material:
 			else:
 				self.trans = 0.0
 
-	def write( self, strm ):
+	def write( self, strm, longestName ):
 		# MATERIAL %s rgb %f %f %f  amb %f %f %f  emis %f %f %f  spec %f %f %f  shi %d  trans %f
 		if not (self.default and self.export_config.mat_offset == 1):
-			strm.write('MATERIAL "{0}" rgb {1:.3f} {2:.3f} {3:.3f}  amb {4:.3f} {5:.3f} {6:.3f}  emis {7:.3f} {8:.3f} {9:.3f}  spec {10:.3f} {11:.3f} {12:.3f}  shi {13} trans {14:.3f}\n'.format(
-							self.name,
+			padding = len(self.name)
+			padding = longestName - padding
+			nameStr = '"{0:s}"{1:s}'.format(self.name, ''.ljust(padding))
+			strm.write('MATERIAL {0:s} rgb {1:.3f} {2:.3f} {3:.3f}  amb {4:.3f} {5:.3f} {6:.3f}  emis {7:.3f} {8:.3f} {9:.3f}  spec {10:.3f} {11:.3f} {12:.3f}  shi {13:03d} trans {14:.3f}\n'.format(
+							nameStr,
 							round(self.rgb[0],3), round(self.rgb[1],3), round(self.rgb[2],3),
 							round(self.amb[0],3), round(self.amb[1],3), round(self.amb[2],3),
 							round(self.emis[0],3), round(self.emis[1],3), round(self.emis[2],3),
