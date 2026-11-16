@@ -24,248 +24,382 @@
 
 import time
 import datetime
-import bpy
-import mathutils
 from math import radians
-from bpy.props import StringProperty, BoolProperty, FloatProperty, EnumProperty
+
+import bpy
+from bpy.types import Operator, TOPBAR_MT_file_import, TOPBAR_MT_file_export
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, \
+    FloatVectorProperty, StringProperty
 from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
+from mathutils import Euler
 
 bl_info = {
-	"name": "AC3D (.ac) format",
-	"description": "AC3D model exporter for blender.",
-	"author": "Chris Marr",
-	"version": (2,0),
-	"blender" : (2,6,0),
-	"api": 41098,
-	"location": "File > Import-Export",
-	"warning": "",
-	"wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Import-Export/Blender-AC3D",
-	"tracker_url": "http://projects.blender.org/tracker/index.php?func=detail&aid=29007&group_id=153&atid=468",
-	"category": "Import-Export"
+    "name": "AC3D (.ac) format",
+    "description": "Inivis AC3D model exporter for Blender.",
+    "author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr., Scott Giese",
+    "version": (4, 2),
+    "blender": (3, 2, 0),
+    "category": "Import-Export",
+    "location": "File > Import-Export",
+    "warning": "",
+    "doc_url": (
+        "http://wiki.flightgear.org/Blender_AC3D_import_and_export"
+        "#Majic79_addon"),
+    "tracker_url": "https://github.com/NikolaiVChr/Blender-AC3D/issues"
 }
 
 # To support reload properly, try to access a package var, if it's there,
 # reload everything
 if "bpy" in locals():
-	import imp
-	if 'import_ac3d' in locals():
-		imp.reload(import_ac3d)
-	if 'export_ac3d' in locals():
-		imp.reload(export_ac3d)
+    import importlib
+    if 'import_ac3d' in locals():
+        importlib.reload(import_ac3d)
+    if 'export_ac3d' in locals():
+        importlib.reload(export_ac3d)
+
 
 def menu_func_import(self, context):
-	self.layout.operator(ImportAC3D.bl_idname, text='AC3D (.ac)')
+    self.layout.operator(AC3D_OT_Import.bl_idname, text='AC3D (.ac)')
 
 
 def menu_func_export(self, context):
-	self.layout.operator(ExportAC3D.bl_idname, text='AC3D (.ac)')
+    self.layout.operator(AC3D_OT_Export.bl_idname, text='AC3D (.ac)')
+
+
+class AC3D_OT_Import(Operator, ImportHelper):
+    """Import from AC3D file format (.ac)"""
+    bl_idname = 'import_scene.import_ac3d'
+    bl_label = 'Import AC3D'
+    bl_options = {'PRESET'}
+
+    filename_ext = '.ac'
+
+    filter_glob: StringProperty(
+        default='*.ac',
+        options={'HIDDEN'})
+
+    axis_forward: EnumProperty(
+        name="Forward",
+        items=(
+            ('X', "X Forward", ""),
+            ('Y', "Y Forward", ""),
+            ('Z', "Z Forward", ""),
+            ('-X', "-X Forward", ""),
+            ('-Y', "-Y Forward", ""),
+            ('-Z', "-Z Forward", "")),
+        default='-Z')
+
+    axis_up: EnumProperty(
+        name="Up",
+        items=(
+            ('X', "X Up", ""),
+            ('Y', "Y Up", ""),
+            ('Z', "Z Up", ""),
+            ('-X', "-X Up", ""),
+            ('-Y', "-Y Up", ""),
+            ('-Z', "-Z Up", "")),
+        default='Y')
+
+    transparency_method: EnumProperty(
+        name="Transparency Method",
+        description="The transparency method that will be set in materials.",
+        items=(
+            ('MASK', "Mask", ""),
+            ('Z_TRANSPARENCY', "Z Transparency", ""),
+            ('RAYTRACE', "RayTrace", "")),
+        default='Z_TRANSPARENCY')
+
+#    use_emis_as_mircol: BoolProperty(
+#        name="Set Emis to Mirror colour",
+#        description="Set AC3D Emission colour into Blender Mirror colour",
+#        default=False)
+
+#    use_amb_as_mircol: BoolProperty(
+#        name="Set Amb to Mirror colour",
+#        description="Set AC3D Ambient colour into Blender Mirror colour",
+#        default=False)
+
+#    display_textured_solid: BoolProperty(
+#        name="Display textured solid",
+#        description=(
+#            "Show textures applied when in Solid view (notice that "
+#            "transparency for materials is then only seen in Material "
+#            "view and Render view)"),
+#        default=False)
+
+    useEeveeSpecular: BoolProperty(
+        name="Use Eevee Specular",
+        description="Set materials to use Eevee Specular instead of Principled BSDF",
+        default=False)
+
+
+    rotation: FloatVectorProperty(
+        description="Import Rotation",
+        subtype="XYZ",
+        unit="ROTATION",
+        default=(0.0, 0.0, 0.0))
+
+    translation: FloatVectorProperty(
+        description="Import Location",
+        subtype="TRANSLATION",
+        unit="NONE",
+        default=(0.0, 0.0, 0.0))
+
+    parent_to: StringProperty(
+        default="")
+
+    collection_name: StringProperty(
+        default="")
+
+#    hide_hidden_objects : BoolProperty(
+#        name="Hide hidden objects",
+#        description=(
+#            "Newer AC3D format supports hiding objects. If checked those "
+#            "objects will be Restrict viewport visibility in Blender (wont "
+#            "be seen until the small eye in Outliner is clicked)."
+#        ),
+#        default=True)
+
+    def execute(self, context):
+        from . import import_ac3d
+        keywords = self.as_keywords(ignore=("axis_forward",
+                                            "axis_up",
+                                            "filter_glob",
+                                            "rotation",
+                                            "translation",
+                                            "hide_props_region"))
+
+        eul = Euler((radians(self.rotation[0]),
+                     radians(self.rotation[1]),
+                     radians(self.rotation[2])), 'XYZ')
+
+        global_matrix = eul.to_matrix().to_4x4() @ \
+            axis_conversion(from_forward=self.axis_forward,
+                            from_up=self.axis_up).to_4x4()
+
+        keywords["global_matrix"] = global_matrix
+
+        t = time.mktime(datetime.datetime.now().timetuple())
+
+        import_ac3d.AC3D_OT_Import(self, context, **keywords)
+
+        t = time.mktime(datetime.datetime.now().timetuple()) - t
+        print('Finished importing in', t, 'seconds')
+
+        return {'FINISHED'}
+
+
+#
+#   The error message operator. When invoked, pops up a dialog
+#   window with the given message.
+#
+
+class AC3D_OT_Message(Operator):
+    bl_idname = "error.message"
+    bl_label = "Message"
+    type: StringProperty()
+    message: StringProperty()
+
+    def execute(self, context):
+        self.report({'INFO'}, self.message)
+        print(self.message)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        wm = context.window_manager
+        return wm.invoke_popup(self, width=400)
+
+    def draw(self, context):
+        self.layout.label(text="A message has arrived")
+        row = self.layout.split(factor=0.25)
+        row.prop(self, "type")
+        row.prop(self, "message")
+        row = self.layout.split(factor=0.80)
+        row.label(text="")
+        row.operator("error")
+
+
+#
+#   The OK button in the error dialog
+#
+
+class AC3D_OT_Ok(Operator):
+    bl_idname = "error.ok"
+    bl_label = "OK"
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+
+class AC3D_OT_Export(Operator, ExportHelper):
+    """Export to AC3D file format (.ac)"""
+    bl_idname = 'export_scene.export_ac3d'
+    bl_label = 'Export AC3D'
+    bl_options = {'PRESET'}
+
+    filename_ext = '.ac'
+
+    v_info = bl_info["version"]
+
+    filter_glob: StringProperty(
+        default='*.ac',
+        options={'HIDDEN'})
+
+    axis_forward: EnumProperty(
+        name="Forward",
+        items=(('X', "X Forward", ""),
+               ('Y', "Y Forward", ""),
+               ('Z', "Z Forward", ""),
+               ('-X', "-X Forward", ""),
+               ('-Y', "-Y Forward", ""),
+               ('-Z', "-Z Forward", "")),
+        default='-Z'
+    )
+
+    axis_up: EnumProperty(
+        name="Up",
+        items=(('X', "X Up", ""),
+               ('Y', "Y Up", ""),
+               ('Z', "Z Up", ""),
+               ('-X', "-X Up", ""),
+               ('-Y', "-Y Up", ""),
+               ('-Z', "-Z Up", "")),
+        default='Y'
+    )
+
+    export_rots: EnumProperty(
+        name="Matrices",
+        description=(
+            "Some loaders interpret the matrices wrong, to be safe, "
+            "use Apply before Export."),
+        items=(
+            ('apply', "Apply before export", ""),
+            ('export', "Export", "")),
+        default='apply',
+    )
+    use_render_layers: BoolProperty(
+        name="Only View Layers",
+        description="Only export from selected view layers",
+        default=True,
+    )
+    use_selection: BoolProperty(
+        name="Selection Only",
+        description="Export selected objects only",
+        default=False,
+    )
+    merge_materials: BoolProperty(
+        name="Merge materials",
+        description="Merge materials that are identical",
+        default=False,
+    )
+    global_doublesided: BoolProperty(
+        name="Double sided",
+        description="If all geometry in AC3D will be double sided or backface culled.",
+        default=False,
+    )
+#    mircol_as_emis: BoolProperty(
+#        name="Mirror col to Emis",
+#        description="Export Blender mirror colour to AC3D emissive colour",
+#        default=False,
+#    )
+#    mircol_as_amb: BoolProperty(
+#        name="Mirror col to Amb",
+#        description="Export Blender mirror colour to AC3D ambient colour",
+#        default=False,
+#    )
+    amb_as_diff: BoolProperty(
+        name="Amb same as Diff",
+        description="Export AC3D ambient colour to be like Diffuse color",
+        default=False,
+    )
+    export_lines: BoolProperty(
+        name="Export lines",
+        description=(
+            "Export standalone edges, bezier curves etc. as AC3D lines. "
+            "Will make export take longer."),
+        default=False,
+    )
+    export_hidden: BoolProperty(
+        name="Export hidden objects",
+        description=(
+            "Newer AC3D format supports hiding objects. If checked "
+            "those objects will be exported as hidden. (notice that in older "
+            "loaders they might show up, or the loader might choke on those "
+            "new tokens)"),
+        default=False,
+    )
+    export_lights: BoolProperty(
+        name="Export lights",
+        description=(
+            "With this checked lights will also be exported. Notice "
+            "they will all become pointlights. If not checked, any geometry "
+            "that might have lamps as parent wont be output."),
+        default=False,
+    )
+    crease_angle: FloatProperty(
+        name="Default Crease Angle",
+        description=(
+            "Default crease/smooth angle for exported .ac "
+            "faces that has not explicit set it."),
+        default=radians(40.0),
+        options={"ANIMATABLE"},
+        unit="ROTATION",
+        subtype="ANGLE",
+    )
+
+    def execute(self, context):
+        if context.active_object:
+            if context.active_object.mode == 'EDIT':
+                print("AC3D was not exported due to being in edit mode.")
+                bpy.ops.error.message(
+                    'INVOKE_DEFAULT',
+                    type="Error",
+                    message='Cannot export AC3D in edit mode.')
+                return {'FINISHED'}
+        from . import export_ac3d
+        keywords = self.as_keywords(ignore=("axis_forward",
+                                            "axis_up",
+                                            "filter_glob",
+                                            "check_existing",
+                                            "export_rots",
+                                            ))
+
+        global_matrix = axis_conversion(to_forward=self.axis_forward,
+                                        to_up=self.axis_up,
+                                        )
+        keywords["global_matrix"] = global_matrix
+        ex_rot = False
+        if self.export_rots == 'export':
+            ex_rot = True
+        keywords["export_rot"] = ex_rot
+        t = time.mktime(datetime.datetime.now().timetuple())
+        export_ac3d.AC3D_OT_Export(self, context, **keywords)
+        t = time.mktime(datetime.datetime.now().timetuple()) - t
+        print('Finished exporting in', t, 'seconds')
+
+        return {'FINISHED'}
+
+
+__classes__ = (
+    AC3D_OT_Export,
+    AC3D_OT_Import,
+    AC3D_OT_Message,
+    AC3D_OT_Ok)
 
 
 def register():
-	bpy.utils.register_module(__name__)
-	bpy.types.INFO_MT_file_import.append(menu_func_import)
-	bpy.types.INFO_MT_file_export.append(menu_func_export)
+    for c in __classes__:
+        bpy.utils.register_class(c)
+    TOPBAR_MT_file_export.append(menu_func_export)
+    TOPBAR_MT_file_import.append(menu_func_import)
+
 
 def unregister():
-	bpy.utils.unregister_module(__name__)
-	bpy.types.INFO_MT_file_import.remove(menu_func_import)
-	bpy.types.INFO_MT_file_export.remove(menu_func_export)
+    for c in reversed(__classes__):
+        bpy.utils.unregister_class(c)
+    TOPBAR_MT_file_export.remove(menu_func_export)
+    TOPBAR_MT_file_import.remove(menu_func_import)
+
 
 if __name__ == "__main__":
-	register()
-
-class ImportAC3D(bpy.types.Operator, ImportHelper):
-	'''Import from AC3D file format (.ac)'''
-	bl_idname = 'import_scene.import_ac3d'
-	bl_label = 'Import AC3D'
-	bl_options = {'PRESET'}	
-
-	filename_ext = '.ac'
-	filter_glob = StringProperty(default='*.ac', options={'HIDDEN'})
-
-	axis_forward = EnumProperty(
-							name="Forward",
-							items=(('X', "X Forward", ""),
-								('Y', "Y Forward", ""),
-								('Z', "Z Forward", ""),
-								('-X', "-X Forward", ""),
-								('-Y', "-Y Forward", ""),
-								('-Z', "-Z Forward", ""),
-							),
-							default='-Z',
-						)
-
-	axis_up = EnumProperty(
-							name="Up",
-							items=(('X', "X Up", ""),
-								('Y', "Y Up", ""),
-								('Z', "Z Up", ""),
-								('-X', "-X Up", ""),
-								('-Y', "-Y Up", ""),
-								('-Z', "-Z Up", ""),
-							),
-							default='Y',
-						)
-
-	use_transparency = BoolProperty(
-							name="Use Transparency",
-							description="Enable transparency for rendering if material alpha < 1.0",
-							default=True,
-						)
-
-	transparency_method = EnumProperty(
-							name="Transparency Method",
-							items=(('MASK', "Mask", ""),
-								('Z_TRANSPARENCY', "Z_Transp", ""),
-								('RAYTRACE', "RayTrace", ""),
-							),
-							default='Z_TRANSPARENCY',
-						)
-
-	use_auto_smooth = BoolProperty(
-							name="Auto Smooth",
-							description="Use object auto smooth if normal angles are beneath Crease angle",
-							default=True,
-						)
-	use_emis_as_mircol = BoolProperty(
-							name="Use Emis as Mirror colour",
-							description="Use Emission colour as Mirror colour",
-							default=True,
-						)
-
-	use_amb_as_mircol = BoolProperty(
-							name="Use Amb as Mirror colour",
-							description="Use Ambient colour as Mirror colour",
-							default=False,
-						)
-	display_transparency = BoolProperty(
-							name="Display Transparency",
-							description="Display transparency in main display",
-							default=True,
-						)
-	display_textured_solid = BoolProperty(
-							name="Display textured solid",
-							description="Show main window with textures applied (transparency works in only in normal direction)",
-							default=False,
-						)
-
-	def execute(self, context):
-		from . import import_ac3d
-		keywords = self.as_keywords(ignore=("axis_forward",
-											"axis_up",
-											"filter_glob",
-											))
-
-		global_matrix = axis_conversion(from_forward=self.axis_forward,
-										from_up=self.axis_up,
-										).to_4x4()
-
-		keywords["global_matrix"] = global_matrix
-
-		t = time.mktime(datetime.datetime.now().timetuple())
-		import_ac3d.ImportAC3D(self, context, **keywords)
-		t = time.mktime(datetime.datetime.now().timetuple()) - t
-		print('Finished importing in', t, 'seconds')
-
-		return {'FINISHED'}
-
-class ExportAC3D(bpy.types.Operator, ExportHelper):
-	'''Export to AC3D file format (.ac)'''
-	bl_idname = 'export_scene.export_ac3d'
-	bl_label = 'Export AC3D'
-	bl_options = {'PRESET'}
-
-	filename_ext = '.ac'
-
-	filter_glob = StringProperty(
-							default='*.ac',
-							options={'HIDDEN'}
-							)
-
-	axis_forward = EnumProperty(
-								name="Forward",
-								items=(('X', "X Forward", ""),
-									('Y', "Y Forward", ""),
-									('Z', "Z Forward", ""),
-									('-X', "-X Forward", ""),
-									('-Y', "-Y Forward", ""),
-									('-Z', "-Z Forward", ""),
-									),
-								default='-Z',
-								)
-
-	axis_up = EnumProperty(
-							name="Up",
-							items=(('X', "X Up", ""),
-								('Y', "Y Up", ""),
-								('Z', "Z Up", ""),
-								('-X', "-X Up", ""),
-								('-Y', "-Y Up", ""),
-								('-Z', "-Z Up", ""),
-								),
-							default='Y',
-							)
-	use_render_layers = BoolProperty(
-							name="Only Render Layers",
-							description="Only export from selected render layers",
-							default=True,
-							)
-	use_selection = BoolProperty(
-							name="Selection Only",
-							description="Export selected objects only",
-							default=False,
-							)
-#	skip_data = BoolProperty(
-#							name="Skip Data",
-#							description="don't export mesh names as data fields",
-#							default=False,
-#							)
-#	global_coords = BoolProperty(
-#							name="Global Co-ordinates",
-#							description="Transform all vertices of all meshes to global coordinates",
-#							default=False,
-#							)
-	mircol_as_emis = BoolProperty(
-							name="Mirror col as Emis",
-							description="export mirror colour as emissive colour",
-							default=True,
-							)
-	mircol_as_amb = BoolProperty(
-							name="Mirror col as Amb",
-							description="export mirror colour as ambient colour",
-							default=False,
-							)
-	crease_angle = FloatProperty(
-							name="Default Crease Angle",
-							description="Default crease angle for exported .ac faces",
-							default=radians(35.0),
-							options={"ANIMATABLE"},
-							unit="ROTATION",
-							subtype="ANGLE",
-							)
-# This behaviour from the original exporter - not applicable?
-#	no_split = BoolProperty(
-#							name="No Split",
-#							description="don't split meshes with multiple textures (or both textured and non-textured polygons)",
-#							default=True,
-#							)
-	def execute(self, context):
-		from . import export_ac3d
-		keywords = self.as_keywords(ignore=("axis_forward",
-											"axis_up",
-											"filter_glob",
-											"check_existing",
-											))
-
-		global_matrix = axis_conversion(to_forward=self.axis_forward,
-										to_up=self.axis_up,
-										).to_4x4()
-
-		keywords["global_matrix"] = global_matrix
-		t = time.mktime(datetime.datetime.now().timetuple())
-		export_ac3d.ExportAC3D(self, context, **keywords)
-		t = time.mktime(datetime.datetime.now().timetuple()) - t
-		print('Finished exporting in', t, 'seconds')
-
-		return {'FINISHED'}
-
+    register()
