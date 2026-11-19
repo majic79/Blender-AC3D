@@ -75,7 +75,6 @@ class ExportConf:
         crease_angle,
         global_doublesided,
     ):
-        # Stuff that needs to be available to the working classes (ha!)
         self.operator = operator
         self.context = context
         self.global_matrix = global_matrix
@@ -90,7 +89,7 @@ class ExportConf:
         self.export_hidden = export_hidden
         self.export_rot = export_rot
         self.export_lights = export_lights
-        self.global_doublesided=global_doublesided
+        self.global_doublesided = global_doublesided
         # if any mesh has no material, this will be changed to 0 and
         # DefaultWhite will be output.
         self.mat_offset = 1
@@ -141,13 +140,8 @@ class AC3D_OT_Export:
             global_doublesided,
         )
 
-        # TRACE("Global: {0}".format(global_matrix))
-
         self.ac_mats = [AC3D.Material('DefaultWhite', None, self.export_conf)]
         self.ac_world = None
-
-        # Parsing the tree in a top down manner and check on the way down which
-        # objects are to be exported
 
         self.world = AC3D.World(
             'Blender_exporter_v' + str(operator.v_info[0]) + "." +
@@ -160,13 +154,11 @@ class AC3D_OT_Export:
         self.world.parse(self.ac_mats)
 
         # dump the contents of the lists to file
-        ac_file = open(filepath, 'w')
-        ac_file.write('AC3Db\n')
-        for ac_mat in self.ac_mats:
-            ac_mat.write(ac_file)
-
-        self.world.write(ac_file)
-        ac_file.close()
+        with open(filepath, 'w') as ac_file:
+            ac_file.write('AC3Db\n')
+            for ac_mat in self.ac_mats:
+                ac_mat.write(ac_file)
+            self.world.write(ac_file)
 
     def parseLevel(self,
                    parent,
@@ -176,28 +168,44 @@ class AC3D_OT_Export:
         """
         Parse a level in the object hierarchy
         """
+        view_layer_objs = set(self.export_conf.context.view_layer.objects)
+
         for ob in objects:
 
             ac_ob = None
+            in_view_layer = ob in view_layer_objs
 
-            # Objects from libraries don't have the select flag set even if
-            # their proxy is selected. We therefore consider all objects from
-            # libraries as selected, as the only possibility to get them
-            # considered is if their proxy should be exported.
-            hidden = ob.hide_get()
-            if self.export_conf.export_hidden:
-                ob.hide_set(False)
+            hidden = False
+            if in_view_layer:
+                hidden = ob.hide_get()
+                if self.export_conf.export_hidden:
+                    ob.hide_set(False)
+                is_visible = ob.visible_get() or self.export_conf.export_hidden
+                is_selected = ob.select_get()
+            else:
+                is_visible = False
+                is_selected = False
 
-            if (not self.export_conf.use_render_layers or
-                ob.visible_get()) and (#was .is_visible(self.export_conf.context.scene)
-                (not self.export_conf.use_selection or
-                 ob.select_get() or ignore_select)):
-                ob.hide_set(hidden)
+            should_export = (
+                (not self.export_conf.use_render_layers or is_visible) and
+                (not self.export_conf.use_selection or is_selected or ignore_select)
+            )
 
-                # We need to check for dupligroups first as every type of
-                # object can be converted to a dupligroup without removing
-                # the data from the old type.
-                if ob.instance_type == 'GROUP':#was .dupli_type
+            if should_export:
+                if in_view_layer:
+                    ob.hide_set(hidden)
+
+                if ob.instance_type == 'COLLECTION' and ob.instance_collection:
+                    ac_ob = AC3D.Group(
+                        ob.name, ob, self.export_conf, local_transform)
+                    coll_objs = ob.instance_collection.objects
+                    children = [
+                        child for child in coll_objs
+                        if not child.parent or
+                        child.parent.name not in coll_objs]
+                    self.parseLevel(ac_ob, children, True,
+                                    local_transform @ ob.matrix_world)
+                elif ob.instance_type == 'GROUP' and getattr(ob, 'dupli_group', None):
                     ac_ob = AC3D.Group(
                         ob.name, ob, self.export_conf, local_transform)
                     children = [
@@ -211,9 +219,11 @@ class AC3D_OT_Export:
                         ob.name, ob, self.export_conf, local_transform)
                 elif ob.type == 'ARMATURE':
                     p = parent
+                    handled_children = set()
                     for bone in ob.pose.bones:
                         for c in ob.children:
                             if c.parent_bone == bone.name:
+                                handled_children.add(c)
                                 ac_child = AC3D.Poly(
                                     c.name, c,
                                     self.export_conf, local_transform)
@@ -224,6 +234,11 @@ class AC3D_OT_Export:
                                     self.parseLevel(
                                         p, c.children,
                                         ignore_select, local_transform)
+                    remaining = [c for c in ob.children if c not in handled_children]
+                    if remaining:
+                        self.parseLevel(
+                            parent, remaining,
+                            ignore_select, local_transform)
                     continue
                 elif ob.type == 'EMPTY':
                     ac_ob = AC3D.Group(
@@ -234,13 +249,14 @@ class AC3D_OT_Export:
                 else:
                     TRACE('Skipping object {0} (type={1})'.format(
                         ob.name, ob.type))
-            ob.hide_set(hidden)
+
+            if in_view_layer:
+                ob.hide_set(hidden)
+
             if ac_ob:
                 parent.addChild(ac_ob)
                 next_parent = ac_ob
             else:
-                # if link chain is broken (aka one element not exported) the
-                # object will be placed in global space (=world)
                 next_parent = self.world
 
             if len(ob.children):
