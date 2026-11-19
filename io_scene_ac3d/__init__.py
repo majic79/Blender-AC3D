@@ -37,7 +37,7 @@ bl_info = {
     "name": "AC3D (.ac) format",
     "description": "Inivis AC3D model exporter for Blender.",
     "author": "Willian P Gerano, Chris Marr, Thomas Geymayer, Nikolai V. Chr., Scott Giese",
-    "version": (4, 2),
+    "version": (4, 2, 1),
     "blender": (3, 2, 0),
     "category": "Import-Export",
     "location": "File > Import-Export",
@@ -52,6 +52,8 @@ bl_info = {
 # reload everything
 if "bpy" in locals():
     import importlib
+    if 'AC3D' in locals():
+        importlib.reload(AC3D)
     if 'import_ac3d' in locals():
         importlib.reload(import_ac3d)
     if 'export_ac3d' in locals():
@@ -109,29 +111,10 @@ class AC3D_OT_Import(Operator, ImportHelper):
             ('RAYTRACE', "RayTrace", "")),
         default='Z_TRANSPARENCY')
 
-#    use_emis_as_mircol: BoolProperty(
-#        name="Set Emis to Mirror colour",
-#        description="Set AC3D Emission colour into Blender Mirror colour",
-#        default=False)
-
-#    use_amb_as_mircol: BoolProperty(
-#        name="Set Amb to Mirror colour",
-#        description="Set AC3D Ambient colour into Blender Mirror colour",
-#        default=False)
-
-#    display_textured_solid: BoolProperty(
-#        name="Display textured solid",
-#        description=(
-#            "Show textures applied when in Solid view (notice that "
-#            "transparency for materials is then only seen in Material "
-#            "view and Render view)"),
-#        default=False)
-
     useEeveeSpecular: BoolProperty(
         name="Use Eevee Specular",
         description="Set materials to use Eevee Specular instead of Principled BSDF",
         default=False)
-
 
     rotation: FloatVectorProperty(
         description="Import Rotation",
@@ -150,15 +133,6 @@ class AC3D_OT_Import(Operator, ImportHelper):
 
     collection_name: StringProperty(
         default="")
-
-#    hide_hidden_objects : BoolProperty(
-#        name="Hide hidden objects",
-#        description=(
-#            "Newer AC3D format supports hiding objects. If checked those "
-#            "objects will be Restrict viewport visibility in Blender (wont "
-#            "be seen until the small eye in Outliner is clicked)."
-#        ),
-#        default=True)
 
     def execute(self, context):
         from . import import_ac3d
@@ -216,7 +190,7 @@ class AC3D_OT_Message(Operator):
         row.prop(self, "message")
         row = self.layout.split(factor=0.80)
         row.label(text="")
-        row.operator("error")
+        row.operator("error.ok")
 
 
 #
@@ -297,16 +271,6 @@ class AC3D_OT_Export(Operator, ExportHelper):
         description="If all geometry in AC3D will be double sided or backface culled.",
         default=False,
     )
-#    mircol_as_emis: BoolProperty(
-#        name="Mirror col to Emis",
-#        description="Export Blender mirror colour to AC3D emissive colour",
-#        default=False,
-#    )
-#    mircol_as_amb: BoolProperty(
-#        name="Mirror col to Amb",
-#        description="Export Blender mirror colour to AC3D ambient colour",
-#        default=False,
-#    )
     amb_as_diff: BoolProperty(
         name="Amb same as Diff",
         description="Export AC3D ambient colour to be like Diffuse color",
