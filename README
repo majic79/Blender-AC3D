@@ -1,3 +1,8 @@
+Updated 19/11/2026 - Updates to import scripts to match export and general changes (listed in changelog) to main AC3D.py to avoid conflicts
+Updated 10/11/2026 - Avionyx - Updated scripts to work with Blender 5.0 - test version for assessment. Simply changed some material handling values, all credit for the script lies with Majic79 and the original README is below for reference, licensing and credit: 
+
+
+
 README for Blender-AC3D - Version 2.01
 
 What is it?
